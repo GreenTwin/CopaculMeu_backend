@@ -1,0 +1,17 @@
+spring:
+  # Database connection
+  datasource:
+    url: jdbc:postgresql://localhost:5432/copacul_meu
+    username: postgres
+    password: test
+
+  # JPA and Hibernate
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+
+  # Flyway
+  flyway:
+    user: postgres
+    password: test

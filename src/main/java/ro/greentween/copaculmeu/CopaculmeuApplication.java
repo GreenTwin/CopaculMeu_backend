@@ -3,10 +3,10 @@ package ro.greentween.copaculmeu;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"ro.greentween.copaculmeu", "tech.petrepopescu"})
 public class CopaculmeuApplication {
 
-	public static void main(String[] args) {
+	static void main(String[] args) {
 		SpringApplication.run(CopaculmeuApplication.class, args);
 	}
 

@@ -1,3 +1,51 @@
 spring:
   application:
     name: copaculmeu
+  profiles:
+    active: local
+  # Database connection
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/copacul_meu}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:test}
+    driver-class-name: org.postgresql.Driver
+
+  # JPA and Hibernate
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+
+  # Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: '0'
+    validate-on-migrate: true
+
+# Springdoc OpenAPI configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    enabled: false
+
+# Scalar API Documentation UI configuration
+scalar:
+  enabled: true
+  path: /scalar
+  page-title: "Copacul Meu - API Reference"
+  theme: purple
+  layout: modern
+  show-sidebar: true
+  dark-mode: true
+
+app:
+  security:
+    pepper: CopaculMeuPepper2026!#$TreeApp
+    activation-code-secret: CopaculMeuActivationCodeSecretKey2026!
+    jwt:
+      secret: ${APP_JWT_SECRET:CopaculMeuUltraSecureJwtSecretKeyMustBeAtLeast256BitsLongForHmacSha256Security2026!}
+      expiration-seconds: 86400

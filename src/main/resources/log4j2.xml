@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="warn">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <!--activate this one if you don't want colors -->
+            <!--<PatternLayout pattern="%d{HH:mm:ss.SSS} %x[%-5level][%X{path}] %logger{1}: %msg%n"/>" />-->
+
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %style{%x}{Cyan}[%highlight{%level}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue}][%X{path}] %logger{1}: %msg%n" disableAnsi="false"/>" />
+        </Console>
+        <RollingFile name="roll-by-time"
+                     fileName="logs/app.log"
+                     filePattern="logs/app.%d{MM-dd-yyyy}.log"
+                     ignoreExceptions="false">
+            <PatternLayout>
+                <Pattern>%d{HH:mm:ss.SSS} %x[%-5level][%X{path}] %logger{1}: %msg%n</Pattern>
+            </PatternLayout>
+            <TimeBasedTriggeringPolicy />
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="roll-by-time" />
+        </Root>
+    </Loggers>
+</Configuration>

@@ -1,0 +1,87 @@
+# =========================================================================
+# Java & JVM
+# =========================================================================
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+!gradle/wrapper/gradle-wrapper.jar
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# Application logs
+logs/
+*.log
+
+# =========================================================================
+# Gradle
+# =========================================================================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# =========================================================================
+# IDEs & Editors
+# =========================================================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Visual Studio Code
+.vscode/
+
+# Eclipse
+.apt_generated
+.apt_generated_tests
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbcache/
+/netbeans/
+
+# =========================================================================
+# OS & Temp Files
+# =========================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*~
+*.swp
+*.swo
+
+# =========================================================================
+# Environment & Local Overrides
+# =========================================================================
+.env
+.env.local
+.env.*.local

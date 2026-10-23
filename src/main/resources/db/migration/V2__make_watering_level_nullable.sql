@@ -1,0 +1,1 @@
+ALTER TABLE trees ALTER COLUMN watering_level DROP NOT NULL;
