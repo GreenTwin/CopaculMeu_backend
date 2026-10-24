@@ -27,6 +27,12 @@ public class Tree {
     @Column(nullable = false)
     private Double longitude;
 
+    @Column(name = "original_latitude", nullable = false)
+    private Double originalLatitude;
+
+    @Column(name = "original_longitude", nullable = false)
+    private Double originalLongitude;
+
     @Column(nullable = false)
     private String species;
 
@@ -56,6 +62,25 @@ public class Tree {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 50)
+    @Builder.Default
+    private ro.greentween.copaculmeu.data.enums.TreeStatus status = ro.greentween.copaculmeu.data.enums.TreeStatus.APPROVED;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposed_by_user_id")
+    private User proposedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by_user_id")
+    private User reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private LocalDateTime reviewedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -70,6 +95,12 @@ public class Tree {
         }
         if (this.updatedAt == null) {
             this.updatedAt = now;
+        }
+        if (this.originalLatitude == null) {
+            this.originalLatitude = this.latitude;
+        }
+        if (this.originalLongitude == null) {
+            this.originalLongitude = this.longitude;
         }
     }
 

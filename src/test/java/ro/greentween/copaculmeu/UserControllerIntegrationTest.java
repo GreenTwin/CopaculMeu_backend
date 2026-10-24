@@ -74,7 +74,6 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.name", is("Dan Ionescu")))
                 .andExpect(jsonPath("$.status", is("UNCONFIRMED")))
                 .andExpect(jsonPath("$.role", is("USER")))
-                .andExpect(jsonPath("$.plan", is("FREE")))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.salt").doesNotExist());
 

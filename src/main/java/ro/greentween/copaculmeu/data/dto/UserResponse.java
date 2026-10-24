@@ -34,9 +34,6 @@ public class UserResponse {
     @Schema(description = "Account confirmation status", example = "UNCONFIRMED")
     private UserStatus status;
 
-    @Schema(description = "Subscription plan", example = "FREE")
-    private UserPlan plan;
-
     @Schema(description = "Account creation timestamp", example = "2026-10-24T10:00:00")
     private LocalDateTime createdAt;
 
@@ -53,7 +50,6 @@ public class UserResponse {
                 .name(user.getName())
                 .role(user.getRole())
                 .status(user.getStatus())
-                .plan(user.getPlan())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

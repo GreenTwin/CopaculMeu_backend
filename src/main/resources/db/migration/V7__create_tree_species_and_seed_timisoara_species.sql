@@ -1,0 +1,67 @@
+-- Migration to create tree_species table and populate with known tree species in Timisoara, Romania
+CREATE TABLE IF NOT EXISTS tree_species (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    scientific_name VARCHAR(255) NOT NULL,
+    common_name VARCHAR(255) NOT NULL,
+    aliases VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tree_species_name ON tree_species(name);
+CREATE INDEX IF NOT EXISTS idx_tree_species_scientific ON tree_species(scientific_name);
+CREATE INDEX IF NOT EXISTS idx_tree_species_common ON tree_species(common_name);
+
+INSERT INTO tree_species (name, scientific_name, common_name, aliases) VALUES
+('Magnolia x soulangeana (Magnolie)', 'Magnolia x soulangeana', 'Magnolie', 'Magnolia soulangeana, Saucer magnolia'),
+('Magnolia stellata (Magnolie stelată)', 'Magnolia stellata', 'Magnolie stelată', 'Magnolie stelata, Star magnolia'),
+('Platanus x acerifolia (Platan)', 'Platanus x acerifolia', 'Platan', 'Platanus acerifolia, Platan de Londra, London plane'),
+('Tilia tomentosa (Tei argintiu)', 'Tilia tomentosa', 'Tei argintiu', 'Tei alb, Silver linden'),
+('Tilia cordata (Tei pucios)', 'Tilia cordata', 'Tei pucios', 'Tei, Tei cu frunza mica, Small-leaved lime, Lime tree'),
+('Tilia platyphyllos (Tei cu frunza mare)', 'Tilia platyphyllos', 'Tei cu frunza mare', 'Large-leaved lime'),
+('Aesculus hippocastanum (Castan sălbatic)', 'Aesculus hippocastanum', 'Castan sălbatic', 'Castan salbatic, Castan, Horse chestnut'),
+('Aesculus x carnea (Castan roșu)', 'Aesculus x carnea', 'Castan roșu', 'Castan rosu, Red horse chestnut'),
+('Quercus robur (Stejar pedunculat)', 'Quercus robur', 'Stejar pedunculat', 'Stejar, Oak, English oak, Stejar comun'),
+('Quercus rubra (Stejar roșu american)', 'Quercus rubra', 'Stejar roșu american', 'Stejar rosu, Northern red oak'),
+('Quercus petraea (Gorun)', 'Quercus petraea', 'Gorun', 'Sessile oak'),
+('Betula pendula (Mesteacăn)', 'Betula pendula', 'Mesteacăn', 'Mesteacan, Birch, Silver birch'),
+('Ginkgo biloba (Ginkgo)', 'Ginkgo biloba', 'Ginkgo', 'Arborele pagodelor, Maidenhair tree'),
+('Acer pseudoplatanus (Paltin de munte)', 'Acer pseudoplatanus', 'Paltin de munte', 'Arțar de munte, Artar, Sycamore maple'),
+('Acer platanoides (Paltin de câmp)', 'Acer platanoides', 'Paltin de câmp', 'Paltin de camp, Arțar, Norway maple'),
+('Acer campestre (Jugastru)', 'Acer campestre', 'Jugastru', 'Field maple'),
+('Acer negundo (Arțar american)', 'Acer negundo', 'Arțar american', 'Artar american, Box elder'),
+('Fraxinus excelsior (Frasin comun)', 'Fraxinus excelsior', 'Frasin comun', 'Frasin, Ash, European ash'),
+('Fraxinus ornus (Mojdrean)', 'Fraxinus ornus', 'Mojdrean', 'Manna ash'),
+('Taxodium distichum (Chiparos de baltă)', 'Taxodium distichum', 'Chiparos de baltă', 'Chiparos de balta, Bald cypress'),
+('Metasequoia glyptostroboides (Secoia de apă)', 'Metasequoia glyptostroboides', 'Secoia de apă', 'Secoia de apa, Dawn redwood'),
+('Salix alba (Salcie albă)', 'Salix alba', 'Salcie albă', 'Salcie alba, Salcie, White willow'),
+('Salix babylonica (Salcie plângătoare)', 'Salix babylonica', 'Salcie plângătoare', 'Salcie plangatoare, Weeping willow'),
+('Populus nigra (Plop negru)', 'Populus nigra', 'Plop negru', 'Plop, Black poplar'),
+('Populus alba (Plop alb)', 'Populus alba', 'Plop alb', 'White poplar'),
+('Populus tremula (Plop tremurător)', 'Populus tremula', 'Plop tremurător', 'Plop tremurator, Aspen'),
+('Robinia pseudoacacia (Salcâm)', 'Robinia pseudoacacia', 'Salcâm', 'Salcam, Black locust'),
+('Sophora japonica (Salcâm japonez)', 'Sophora japonica', 'Salcâm japonez', 'Salcam japonez, Styphnolobium japonicum, Japanese pagoda tree'),
+('Liriodendron tulipifera (Arborele lalea)', 'Liriodendron tulipifera', 'Arborele lalea', 'Tulipan, Tulip tree'),
+('Catalpa bignonioides (Catalpă)', 'Catalpa bignonioides', 'Catalpă', 'Catalpa, Southern catalpa'),
+('Paulownia tomentosa (Paulownia)', 'Paulownia tomentosa', 'Paulownia', 'Arborele de imparateasa, Empress tree'),
+('Prunus cerasifera (Corcoduș roșu)', 'Prunus cerasifera', 'Corcoduș roșu', 'Corcodus rosu, Corcodus, Cherry plum, Prunus pissardii'),
+('Prunus serrulata (Cireș japonez)', 'Prunus serrulata', 'Cireș japonez', 'Cires japonez, Japanese cherry'),
+('Celtis australis (Sâmbovină)', 'Celtis australis', 'Sâmbovină', 'Sambovina, European nettle tree'),
+('Cedrus atlantica (Cedru de Atlas)', 'Cedrus atlantica', 'Cedru de Atlas', 'Atlas cedar'),
+('Pinus nigra (Pin negru)', 'Pinus nigra', 'Pin negru', 'Austrian pine'),
+('Pinus sylvestris (Pin de pădure)', 'Pinus sylvestris', 'Pin de pădure', 'Pin de padure, Pin, Scots pine'),
+('Picea abies (Molid)', 'Picea abies', 'Molid', 'Norway spruce'),
+('Juglans regia (Nuc comun)', 'Juglans regia', 'Nuc comun', 'Nuc, Walnut'),
+('Corylus colurna (Alun turcesc)', 'Corylus colurna', 'Alun turcesc', 'Turkish hazel'),
+('Carpinus betulus (Carpen)', 'Carpinus betulus', 'Carpen', 'European hornbeam'),
+('Ulmus minor (Ulm de câmp)', 'Ulmus minor', 'Ulm de câmp', 'Ulm de camp, Ulm, Field elm'),
+('Koelreuteria paniculata (Arborele de săpun)', 'Koelreuteria paniculata', 'Arborele de săpun', 'Arborele de sapun, Goldenrain tree'),
+('Cercis siliquastrum (Arborele Iuda)', 'Cercis siliquastrum', 'Arborele Iuda', 'Judas tree'),
+('Liquidambar styraciflua (Arborele de ambră)', 'Liquidambar styraciflua', 'Arborele de ambră', 'Arborele de ambra, Sweetgum'),
+('Morus alba (Dud alb)', 'Morus alba', 'Dud alb', 'Dud, White mulberry'),
+('Morus nigra (Dud negru)', 'Morus nigra', 'Dud negru', 'Black mulberry'),
+('Ailanthus altissima (Cenușer)', 'Ailanthus altissima', 'Cenușer', 'Cenuser, Tree of heaven'),
+('Alnus glutinosa (Arin negru)', 'Alnus glutinosa', 'Arin negru', 'Black alder'),
+('Fagus sylvatica (Fag european)', 'Fagus sylvatica', 'Fag european', 'Fag, European beech')
+ON CONFLICT (name) DO NOTHING;

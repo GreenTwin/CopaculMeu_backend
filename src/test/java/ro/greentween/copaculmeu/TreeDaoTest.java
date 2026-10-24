@@ -134,4 +134,31 @@ class TreeDaoTest {
         assertThat(radiusResults).hasSize(1);
         assertThat(radiusResults.get(0).getSpecies()).isEqualTo("Acer campestre");
     }
+
+    @Test
+    void shouldFilterPendingProposals() {
+        treeDao.persist(Tree.builder()
+                .latitude(44.4330)
+                .longitude(26.1000)
+                .species("Approved Oak")
+                .healthLevel(HealthLevel.EXCELLENT)
+                .status(ro.greentween.copaculmeu.data.enums.TreeStatus.APPROVED)
+                .build());
+
+        treeDao.persist(Tree.builder()
+                .latitude(44.4340)
+                .longitude(26.1010)
+                .species("Proposed Birch")
+                .healthLevel(HealthLevel.GOOD)
+                .status(ro.greentween.copaculmeu.data.enums.TreeStatus.PENDING_APPROVAL)
+                .build());
+
+        List<Tree> pending = treeDao.findPendingProposals();
+        assertThat(pending).hasSize(1);
+        assertThat(pending.get(0).getSpecies()).isEqualTo("Proposed Birch");
+
+        List<Tree> approved = treeDao.findAllApproved();
+        assertThat(approved).hasSize(1);
+        assertThat(approved.get(0).getSpecies()).isEqualTo("Approved Oak");
+    }
 }

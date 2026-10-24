@@ -27,6 +27,12 @@ public class TreeResponse {
     @Schema(description = "GPS Longitude coordinate", example = "26.1063")
     private Double longitude;
 
+    @Schema(description = "Original GPS Latitude coordinate before check-in averaging", example = "44.4323")
+    private Double originalLatitude;
+
+    @Schema(description = "Original GPS Longitude coordinate before check-in averaging", example = "26.1063")
+    private Double originalLongitude;
+
     @Schema(description = "Tree species", example = "Quercus robur")
     private String species;
 
@@ -54,6 +60,21 @@ public class TreeResponse {
     @Schema(description = "Notes and forestry observations", example = "Healthy specimen, recently inspected")
     private String notes;
 
+    @Schema(description = "Tree proposal and approval status", example = "APPROVED")
+    private ro.greentween.copaculmeu.data.enums.TreeStatus status;
+
+    @Schema(description = "User ID who proposed the tree", example = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+    private java.util.UUID proposedByUserId;
+
+    @Schema(description = "Admin user ID who reviewed the proposal", example = "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22")
+    private java.util.UUID reviewedByUserId;
+
+    @Schema(description = "Review timestamp", example = "2026-10-24T10:00:00")
+    private LocalDateTime reviewedAt;
+
+    @Schema(description = "Rejection explanation if proposal was rejected", example = "Duplicate tree already recorded")
+    private String rejectionReason;
+
     @Schema(description = "Record creation timestamp", example = "2026-10-23T20:15:00")
     private LocalDateTime createdAt;
 
@@ -68,6 +89,8 @@ public class TreeResponse {
                 .id(tree.getId())
                 .latitude(tree.getLatitude())
                 .longitude(tree.getLongitude())
+                .originalLatitude(tree.getOriginalLatitude())
+                .originalLongitude(tree.getOriginalLongitude())
                 .species(tree.getSpecies())
                 .healthLevel(tree.getHealthLevel())
                 .wateringLevel(tree.getWateringLevel())
@@ -77,6 +100,11 @@ public class TreeResponse {
                 .trunkCircumference(tree.getTrunkCircumference())
                 .locationDescription(tree.getLocationDescription())
                 .notes(tree.getNotes())
+                .status(tree.getStatus())
+                .proposedByUserId(tree.getProposedBy() != null ? tree.getProposedBy().getId() : null)
+                .reviewedByUserId(tree.getReviewedBy() != null ? tree.getReviewedBy().getId() : null)
+                .reviewedAt(tree.getReviewedAt())
+                .rejectionReason(tree.getRejectionReason())
                 .createdAt(tree.getCreatedAt())
                 .updatedAt(tree.getUpdatedAt())
                 .build();

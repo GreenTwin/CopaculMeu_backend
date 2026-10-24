@@ -6,6 +6,7 @@ import jakarta.persistence.criteria.Root;
 import lombok.Getter;
 import lombok.Setter;
 import ro.greentween.copaculmeu.data.enums.HealthLevel;
+import ro.greentween.copaculmeu.data.enums.TreeStatus;
 import ro.greentween.copaculmeu.data.enums.WateringLevel;
 import ro.greentween.copaculmeu.data.model.Tree;
 import tech.petrepopescu.common.data.filter.JPAFilter;
@@ -23,6 +24,7 @@ public class TreeFilter extends JPAFilter<Tree> {
     private String species;
     private HealthLevel healthLevel;
     private WateringLevel wateringLevel;
+    private TreeStatus status;
 
     @Override
     public Predicate getPredicate(CriteriaBuilder criteriaBuilder, Root<Tree> root) {
@@ -48,6 +50,9 @@ public class TreeFilter extends JPAFilter<Tree> {
         }
         if (wateringLevel != null) {
             predicates.add(equals(criteriaBuilder, root, "wateringLevel", wateringLevel));
+        }
+        if (status != null) {
+            predicates.add(equals(criteriaBuilder, root, "status", status));
         }
 
         return andPredicateBuilder(criteriaBuilder, predicates.toArray(new Predicate[0]));

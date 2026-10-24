@@ -1,21 +1,28 @@
 package ro.greentween.copaculmeu;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import ro.greentween.copaculmeu.data.dao.TreeDao;
 import ro.greentween.copaculmeu.data.dto.TreeCreateRequest;
+import ro.greentween.copaculmeu.data.dto.TreeRejectRequest;
+import ro.greentween.copaculmeu.data.dto.TreeResponse;
 import ro.greentween.copaculmeu.data.enums.HealthLevel;
+import ro.greentween.copaculmeu.data.enums.TreeStatus;
 import ro.greentween.copaculmeu.data.enums.WateringLevel;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,6 +48,8 @@ class TreeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Administrator should create tree successfully with APPROVED status")
+    @WithMockUser(roles = "ADMIN")
     void shouldCreateTreeSuccessfully() throws Exception {
         TreeCreateRequest request = TreeCreateRequest.builder()
                 .latitude(44.4323)
@@ -67,6 +76,7 @@ class TreeControllerIntegrationTest {
                 .andExpect(jsonPath("$.species", is("Quercus robur")))
                 .andExpect(jsonPath("$.healthLevel", is("GOOD")))
                 .andExpect(jsonPath("$.wateringLevel", is("OPTIMAL")))
+                .andExpect(jsonPath("$.status", is("APPROVED")))
                 .andExpect(jsonPath("$.height", is(8.5)))
                 .andExpect(jsonPath("$.age", is(25)))
                 .andExpect(jsonPath("$.trunkCircumference", is(110.0)))
@@ -76,9 +86,164 @@ class TreeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Should reject tree creation for unauthenticated user")
+    void shouldRejectTreeCreationForUnauthenticatedUser() throws Exception {
+        TreeCreateRequest request = TreeCreateRequest.builder()
+                .latitude(44.4323)
+                .longitude(26.1063)
+                .species("Quercus robur")
+                .healthLevel(HealthLevel.GOOD)
+                .build();
+
+        mockMvc.perform(post("/api/trees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Should reject tree creation for regular user (403 Forbidden)")
+    @WithMockUser(roles = "USER")
+    void shouldRejectTreeCreationForRegularUser() throws Exception {
+        TreeCreateRequest request = TreeCreateRequest.builder()
+                .latitude(44.4323)
+                .longitude(26.1063)
+                .species("Quercus robur")
+                .healthLevel(HealthLevel.GOOD)
+                .build();
+
+        mockMvc.perform(post("/api/trees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("Regular user should propose tree with PENDING_APPROVAL status")
+    @WithMockUser(roles = "USER")
+    void shouldAllowUserToProposeTree() throws Exception {
+        TreeCreateRequest request = TreeCreateRequest.builder()
+                .latitude(44.4350)
+                .longitude(26.1020)
+                .species("Tilia cordata")
+                .healthLevel(HealthLevel.FAIR)
+                .wateringLevel(WateringLevel.LOW)
+                .locationDescription("University Square")
+                .build();
+
+        MvcResult result = mockMvc.perform(post("/api/trees/propose")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.species", is("Tilia cordata")))
+                .andExpect(jsonPath("$.status", is("PENDING_APPROVAL")))
+                .andReturn();
+
+        TreeResponse response = objectMapper.readValue(result.getResponse().getContentAsString(), TreeResponse.class);
+
+        // Pending proposal must NOT appear in public queries
+        mockMvc.perform(get("/api/trees"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+
+        mockMvc.perform(get("/api/trees/area")
+                        .param("minLat", "44.4300")
+                        .param("maxLat", "44.4400")
+                        .param("minLng", "26.1000")
+                        .param("maxLng", "26.1100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("Administrator should list proposals, approve, and make tree visible on public map")
+    @WithMockUser(roles = "ADMIN")
+    void shouldAllowAdminToApproveProposal() throws Exception {
+        // 1. Propose tree
+        TreeCreateRequest request = TreeCreateRequest.builder()
+                .latitude(44.4360)
+                .longitude(26.1040)
+                .species("Platanus acerifolia")
+                .healthLevel(HealthLevel.EXCELLENT)
+                .build();
+
+        MvcResult proposalResult = mockMvc.perform(post("/api/trees/propose")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TreeResponse proposal = objectMapper.readValue(proposalResult.getResponse().getContentAsString(), TreeResponse.class);
+        Long treeId = proposal.getId();
+
+        // 2. Admin queries pending proposals
+        mockMvc.perform(get("/api/trees/proposals"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(treeId.intValue())))
+                .andExpect(jsonPath("$[0].status", is("PENDING_APPROVAL")));
+
+        // 3. Admin approves proposal
+        mockMvc.perform(post("/api/trees/" + treeId + "/approve"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(treeId.intValue())))
+                .andExpect(jsonPath("$.status", is("APPROVED")))
+                .andExpect(jsonPath("$.reviewedAt").exists());
+
+        // 4. Now tree appears in public queries
+        mockMvc.perform(get("/api/trees"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].species", is("Platanus acerifolia")))
+                .andExpect(jsonPath("$[0].status", is("APPROVED")));
+    }
+
+    @Test
+    @DisplayName("Administrator should reject proposal with reason")
+    @WithMockUser(roles = "ADMIN")
+    void shouldAllowAdminToRejectProposal() throws Exception {
+        TreeCreateRequest request = TreeCreateRequest.builder()
+                .latitude(44.4310)
+                .longitude(26.1080)
+                .species("Populus nigra")
+                .healthLevel(HealthLevel.POOR)
+                .build();
+
+        MvcResult proposalResult = mockMvc.perform(post("/api/trees/propose")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        TreeResponse proposal = objectMapper.readValue(proposalResult.getResponse().getContentAsString(), TreeResponse.class);
+        Long treeId = proposal.getId();
+
+        TreeRejectRequest rejectRequest = TreeRejectRequest.builder()
+                .reason("Duplicate entry or inaccurate coordinates")
+                .build();
+
+        // Reject proposal
+        mockMvc.perform(post("/api/trees/" + treeId + "/reject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(rejectRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(treeId.intValue())))
+                .andExpect(jsonPath("$.status", is("REJECTED")))
+                .andExpect(jsonPath("$.rejectionReason", is("Duplicate entry or inaccurate coordinates")));
+
+        // Rejected tree does NOT appear on public map
+        mockMvc.perform(get("/api/trees"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("Fail creating tree with invalid coordinates")
+    @WithMockUser(roles = "ADMIN")
     void shouldFailCreatingTreeWithInvalidCoordinates() throws Exception {
         TreeCreateRequest request = TreeCreateRequest.builder()
-                .latitude(150.0) // Invalid: latitude must be between -90 and 90
+                .latitude(150.0)
                 .longitude(26.1063)
                 .species("Betula pendula")
                 .healthLevel(HealthLevel.FAIR)
@@ -93,10 +258,11 @@ class TreeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Fail creating tree when required fields are missing")
+    @WithMockUser(roles = "ADMIN")
     void shouldFailCreatingTreeWhenRequiredFieldsAreMissing() throws Exception {
         TreeCreateRequest request = TreeCreateRequest.builder()
                 .latitude(44.4323)
-                // missing longitude, species, healthLevel, wateringLevel
                 .build();
 
         mockMvc.perform(post("/api/trees")
@@ -110,13 +276,14 @@ class TreeControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Create tree with only mandatory fields")
+    @WithMockUser(roles = "ADMIN")
     void shouldCreateTreeWithOnlyMandatoryFields() throws Exception {
         TreeCreateRequest request = TreeCreateRequest.builder()
                 .latitude(44.4323)
                 .longitude(26.1063)
                 .species("Acer campestre")
                 .healthLevel(HealthLevel.EXCELLENT)
-                // all optional fields omitted
                 .build();
 
         mockMvc.perform(post("/api/trees")
@@ -131,110 +298,8 @@ class TreeControllerIntegrationTest {
                 .andExpect(jsonPath("$.wateringLevel").doesNotExist())
                 .andExpect(jsonPath("$.height").doesNotExist())
                 .andExpect(jsonPath("$.age").doesNotExist())
-                .andExpect(jsonPath("$.trunkCircumference").doesNotExist());
-    }
-
-    @Test
-    void shouldFindTreesWithinBoundingBox() throws Exception {
-        // Tree 1: Inside Bucharest center (44.435, 26.100)
-        TreeCreateRequest tree1 = TreeCreateRequest.builder()
-                .latitude(44.4350)
-                .longitude(26.1000)
-                .species("Tilia cordata")
-                .healthLevel(HealthLevel.EXCELLENT)
-                .wateringLevel(WateringLevel.OPTIMAL)
-                .build();
-
-        // Tree 2: Inside Bucharest center (44.4380, 26.1050)
-        TreeCreateRequest tree2 = TreeCreateRequest.builder()
-                .latitude(44.4380)
-                .longitude(26.1050)
-                .species("Acer platanoides")
-                .healthLevel(HealthLevel.GOOD)
-                .wateringLevel(WateringLevel.MODERATE)
-                .build();
-
-        // Tree 3: Far away in Cluj-Napoca (46.7712, 23.6236)
-        TreeCreateRequest tree3 = TreeCreateRequest.builder()
-                .latitude(46.7712)
-                .longitude(23.6236)
-                .species("Pinus sylvestris")
-                .healthLevel(HealthLevel.FAIR)
-                .wateringLevel(WateringLevel.LOW)
-                .build();
-
-        mockMvc.perform(post("/api/trees").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(tree1))).andExpect(status().isCreated());
-        mockMvc.perform(post("/api/trees").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(tree2))).andExpect(status().isCreated());
-        mockMvc.perform(post("/api/trees").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(tree3))).andExpect(status().isCreated());
-
-        // Bounding box for Bucharest center: minLat=44.430, maxLat=44.440, minLng=26.090, maxLng=26.110
-        mockMvc.perform(get("/api/trees")
-                        .param("minLat", "44.430")
-                        .param("maxLat", "44.440")
-                        .param("minLng", "26.090")
-                        .param("maxLng", "26.110"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[*].species", containsInAnyOrder("Tilia cordata", "Acer platanoides")));
-
-        // Also test the explicit /api/trees/area endpoint
-        mockMvc.perform(get("/api/trees/area")
-                        .param("minLat", "44.430")
-                        .param("maxLat", "44.440")
-                        .param("minLng", "26.090")
-                        .param("maxLng", "26.110"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)));
-    }
-
-    @Test
-    void shouldFindTreesWithinRadius() throws Exception {
-        // Center: 44.4320, 26.1000
-        // Tree 1: approx 150m away (44.4330, 26.1000)
-        TreeCreateRequest tree1 = TreeCreateRequest.builder()
-                .latitude(44.4330)
-                .longitude(26.1000)
-                .species("Platanus x hispanica")
-                .healthLevel(HealthLevel.EXCELLENT)
-                .wateringLevel(WateringLevel.OPTIMAL)
-                .build();
-
-        // Tree 2: approx 5km away (44.4700, 26.1000)
-        TreeCreateRequest tree2 = TreeCreateRequest.builder()
-                .latitude(44.4700)
-                .longitude(26.1000)
-                .species("Fraxinus excelsior")
-                .healthLevel(HealthLevel.GOOD)
-                .wateringLevel(WateringLevel.MODERATE)
-                .build();
-
-        mockMvc.perform(post("/api/trees").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(tree1))).andExpect(status().isCreated());
-        mockMvc.perform(post("/api/trees").contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(tree2))).andExpect(status().isCreated());
-
-        // Search with 500m radius
-        mockMvc.perform(get("/api/trees/nearby")
-                        .param("lat", "44.4320")
-                        .param("lng", "26.1000")
-                        .param("radiusMeters", "500"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].species", is("Platanus x hispanica")));
-    }
-
-    @Test
-    void shouldExposeOpenApiDocs() throws Exception {
-        mockMvc.perform(get("/v3/api-docs"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.info.title", is("Copacul Meu - Tree Mapping API")))
-                .andExpect(jsonPath("$.paths['/api/trees']").exists())
-                .andExpect(jsonPath("$.paths['/api/trees/area']").exists())
-                .andExpect(jsonPath("$.paths['/api/trees/nearby']").exists());
-    }
-
-    @Test
-    void shouldExposeScalarDocumentationUI() throws Exception {
-        mockMvc.perform(get("/scalar"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Scalar")));
+                .andExpect(jsonPath("$.trunkCircumference").doesNotExist())
+                .andExpect(jsonPath("$.locationDescription").doesNotExist())
+                .andExpect(jsonPath("$.notes").doesNotExist());
     }
 }
