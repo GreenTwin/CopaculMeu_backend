@@ -42,9 +42,13 @@ class TreeControllerIntegrationTest {
     @Autowired
     private TreeDao treeDao;
 
+    @Autowired
+    private ro.greentween.copaculmeu.service.TreeCacheEvictionService treeCacheEvictionService;
+
     @BeforeEach
     void setUp() {
         treeDao.deleteAll();
+        treeCacheEvictionService.clearAllCaches();
     }
 
     @Test
@@ -118,43 +122,45 @@ class TreeControllerIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test
-    @DisplayName("Regular user should propose tree with PENDING_APPROVAL status")
-    @WithMockUser(roles = "USER")
-    void shouldAllowUserToProposeTree() throws Exception {
-        TreeCreateRequest request = TreeCreateRequest.builder()
-                .latitude(44.4350)
-                .longitude(26.1020)
-                .species("Tilia cordata")
-                .healthLevel(HealthLevel.FAIR)
-                .wateringLevel(WateringLevel.LOW)
-                .locationDescription("University Square")
-                .build();
-
-        MvcResult result = mockMvc.perform(post("/api/trees/propose")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.species", is("Tilia cordata")))
-                .andExpect(jsonPath("$.status", is("PENDING_APPROVAL")))
-                .andReturn();
-
-        TreeResponse response = objectMapper.readValue(result.getResponse().getContentAsString(), TreeResponse.class);
-
-        // Pending proposal must NOT appear in public queries
-        mockMvc.perform(get("/api/trees"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
-
-        mockMvc.perform(get("/api/trees/area")
-                        .param("minLat", "44.4300")
-                        .param("maxLat", "44.4400")
-                        .param("minLng", "26.1000")
-                        .param("maxLng", "26.1100"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
-    }
+//    TODO: Temporary, all trees added are approved until we test the app and populate the database better
+//
+//    @Test
+//    @DisplayName("Regular user should propose tree with PENDING_APPROVAL status")
+//    @WithMockUser(roles = "USER")
+//    void shouldAllowUserToProposeTree() throws Exception {
+//        TreeCreateRequest request = TreeCreateRequest.builder()
+//                .latitude(44.4350)
+//                .longitude(26.1020)
+//                .species("Tilia cordata")
+//                .healthLevel(HealthLevel.FAIR)
+//                .wateringLevel(WateringLevel.LOW)
+//                .locationDescription("University Square")
+//                .build();
+//
+//        MvcResult result = mockMvc.perform(post("/api/trees/propose")
+//                        .contentType(MediaType.APPLICATION_JSON)
+//                        .content(objectMapper.writeValueAsString(request)))
+//                .andExpect(status().isCreated())
+//                .andExpect(jsonPath("$.id").isNumber())
+//                .andExpect(jsonPath("$.species", is("Tilia cordata")))
+//                .andExpect(jsonPath("$.status", is("PENDING_APPROVAL")))
+//                .andReturn();
+//
+//        TreeResponse response = objectMapper.readValue(result.getResponse().getContentAsString(), TreeResponse.class);
+//
+//        // Pending proposal must NOT appear in public queries
+//        mockMvc.perform(get("/api/trees"))
+//                .andExpect(status().isOk())
+//                .andExpect(jsonPath("$", hasSize(0)));
+//
+//        mockMvc.perform(get("/api/trees/area")
+//                        .param("minLat", "44.4300")
+//                        .param("maxLat", "44.4400")
+//                        .param("minLng", "26.1000")
+//                        .param("maxLng", "26.1100"))
+//                .andExpect(status().isOk())
+//                .andExpect(jsonPath("$", hasSize(0)));
+//    }
 
     @Test
     @DisplayName("Administrator should list proposals, approve, and make tree visible on public map")

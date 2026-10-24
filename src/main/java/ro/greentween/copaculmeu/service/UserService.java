@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ro.greentween.copaculmeu.data.dao.UserActivationCodeDao;
 import ro.greentween.copaculmeu.data.dao.UserDao;
+import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
 import ro.greentween.copaculmeu.data.enums.UserRole;
@@ -23,6 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -99,6 +101,67 @@ public class UserService {
             throw new IllegalArgumentException("User with id " + id + " not found");
         }
         return UserResponse.fromEntity(user);
+    }
+
+    @Transactional
+    public UserResponse activateUser(UserActivationRequest request) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        User user = userDao.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User with email " + normalizedEmail + " not found"));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            log.info("User {} is already active", normalizedEmail);
+            return UserResponse.fromEntity(user);
+        }
+
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            throw new IllegalArgumentException("Account is suspended");
+        }
+
+        List<UserActivationCode> codes = activationCodeDao.findByUserId(user.getId());
+        OffsetDateTime now = OffsetDateTime.now();
+
+        UserActivationCode matchedCode = null;
+        for (UserActivationCode activationCode : codes) {
+            if (activationCode.getUsedAt() != null || activationCode.getExpiresAt().isBefore(now)) {
+                continue;
+            }
+
+            try {
+                CodeEncryptor codeEncryptor = codeEncryptorFactory.getEncryptor(activationCode.getEncryptorVersion());
+                String decryptedCode = codeEncryptor.decrypt(activationCode.getCode(), activationSecret);
+                if (decryptedCode.equals(request.getCode().trim())) {
+                    matchedCode = activationCode;
+                    break;
+                }
+            } catch (GeneralSecurityException e) {
+                log.error("Failed to decrypt activation code for user {}", normalizedEmail, e);
+            }
+        }
+
+        if (matchedCode == null) {
+            throw new IllegalArgumentException("Invalid or expired activation code");
+        }
+
+        matchedCode.setUsedAt(now);
+        activationCodeDao.update(matchedCode);
+
+        user.setStatus(UserStatus.ACTIVE);
+        User updatedUser = userDao.update(user);
+
+        log.info("User {} activated successfully", normalizedEmail);
+        return UserResponse.fromEntity(updatedUser);
+    }
+
+    @Transactional
+    public UserResponse setUserStatus(UUID userId, UserStatus status) {
+        User user = userDao.find(userId);
+        if (user == null) {
+            throw new IllegalArgumentException("User with id " + userId + " not found");
+        }
+        user.setStatus(status);
+        User updated = userDao.update(user);
+        return UserResponse.fromEntity(updated);
     }
 
     private String generateActivationCode() {

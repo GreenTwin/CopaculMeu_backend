@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import ro.greentween.copaculmeu.data.dto.AuthResponse;
 import ro.greentween.copaculmeu.data.dto.LoginRequest;
 import ro.greentween.copaculmeu.data.dto.LogoutResponse;
+import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
 import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.service.AuthService;
@@ -42,6 +43,18 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request, response);
         return ResponseEntity.ok(authResponse);
+    }
+
+    @PostMapping("/activate")
+    @Operation(summary = "Activate user account", description = "Validates the activation code sent to the user's email and marks their account as ACTIVE.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Account activated successfully",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired activation code, or user not found")
+    })
+    public ResponseEntity<UserResponse> activate(@Valid @RequestBody UserActivationRequest request) {
+        UserResponse response = userService.activateUser(request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")

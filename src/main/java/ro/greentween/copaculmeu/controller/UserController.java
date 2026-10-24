@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
 import ro.greentween.copaculmeu.service.UserService;
@@ -40,6 +41,16 @@ public class UserController {
             jakarta.servlet.http.HttpServletRequest request,
             jakarta.servlet.http.HttpServletResponse response) {
         return ResponseEntity.ok(authService.logout(request, response));
+    }
+
+    @Operation(summary = "Activate user account", description = "Activates a user account using the 6-digit activation code.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Account activated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired activation code, or user not found")
+    })
+    @PostMapping("/activate")
+    public ResponseEntity<UserResponse> activate(@Valid @RequestBody UserActivationRequest request) {
+        return ResponseEntity.ok(userService.activateUser(request));
     }
 
     @Operation(summary = "Register a new user", description = "Creates a new user account with encrypted password, generates an activation code, and saves the code using the configured CodeEncryptor version.")

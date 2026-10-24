@@ -9,6 +9,7 @@ import ro.greentween.copaculmeu.data.enums.HealthLevel;
 import ro.greentween.copaculmeu.data.model.Tree;
 import ro.greentween.copaculmeu.data.enums.WateringLevel;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,7 +17,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Schema(description = "Tree details representation")
-public class TreeResponse {
+public class TreeResponse implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Schema(description = "Unique ID of the tree", example = "1")
     private Long id;

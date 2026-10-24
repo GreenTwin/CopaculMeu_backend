@@ -48,7 +48,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 try {
                     UUID userId = UUID.fromString(claims.getSubject());
                     User user = userDao.find(userId);
-                    if (user != null && user.getStatus() != UserStatus.SUSPENDED) {
+                    if (user != null && user.getStatus() == UserStatus.ACTIVE) {
                         UserPrincipal principal = UserPrincipal.fromEntity(user);
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());

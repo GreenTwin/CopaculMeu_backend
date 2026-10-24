@@ -20,6 +20,7 @@ import ro.greentween.copaculmeu.data.dto.TreeCheckinResponse;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.enums.HealthLevel;
 import ro.greentween.copaculmeu.data.enums.TreeStatus;
+import ro.greentween.copaculmeu.data.enums.UserStatus;
 import ro.greentween.copaculmeu.data.enums.WateringLevel;
 import ro.greentween.copaculmeu.data.model.Tree;
 import ro.greentween.copaculmeu.data.model.User;
@@ -71,12 +72,16 @@ class TreeCheckinIntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @Autowired
+    private ro.greentween.copaculmeu.service.TreeCacheEvictionService treeCacheEvictionService;
+
     @BeforeEach
     void setUp() {
         treeCheckinDao.deleteAll();
         treeDao.deleteAll();
         userActivationCodeDao.deleteAll();
         userDao.deleteAll();
+        treeCacheEvictionService.clearAllCaches();
     }
 
     private User createTestUser(String email, String name) {
@@ -85,7 +90,9 @@ class TreeCheckinIntegrationTest {
                 .password("Password123!")
                 .name(name)
                 .build());
-        return userDao.findByEmail(email).orElseThrow();
+        User user = userDao.findByEmail(email).orElseThrow();
+        user.setStatus(UserStatus.ACTIVE);
+        return transactionTemplate.execute(status -> userDao.update(user));
     }
 
     private Tree createApprovedTree(double lat, double lng, String species) {
@@ -471,5 +478,103 @@ class TreeCheckinIntegrationTest {
                 .andExpect(jsonPath("$[0].treeId", is(tree.getId().intValue())))
                 .andExpect(jsonPath("$[0].wateringLevel", is("OPTIMAL")))
                 .andExpect(jsonPath("$[0].notes", is("History test observation")));
+    }
+
+    @Test
+    @DisplayName("Should enforce 24-hour rate limit on same tree, but allow checking in multiple different trees in a day")
+    void shouldEnforce24HourLimitOnSameTreeWhileAllowingMultipleTrees() throws Exception {
+        Tree tree1 = createApprovedTree(44.432000, 26.100000, "Platanus x acerifolia (Platan)");
+        Tree tree2 = createApprovedTree(44.433000, 26.101000, "Tilia tomentosa (Tei argintiu)");
+
+        User userA = createTestUser("daily.checker@example.ro", "Daily Checker");
+        User userB = createTestUser("second.checker@example.ro", "Second Checker");
+        String tokenA = jwtService.generateToken(userA);
+        String tokenB = jwtService.generateToken(userB);
+
+        TreeCheckinRequest checkinReq1 = TreeCheckinRequest.builder()
+                .latitude(44.432000)
+                .longitude(26.100000)
+                .wateringLevel(WateringLevel.OPTIMAL)
+                .watered(true)
+                .build();
+
+        // 1. User A checks in on Tree 1 -> SUCCESS (201 Created)
+        mockMvc.perform(post("/api/trees/" + tree1.getId() + "/check-ins")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(checkinReq1)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valid", is(true)));
+
+        // 2. User A attempts to check in on Tree 1 AGAIN within 24 hours -> REJECTED (400 Bad Request)
+        mockMvc.perform(post("/api/trees/" + tree1.getId() + "/check-ins")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(checkinReq1)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("Bad Request")))
+                .andExpect(jsonPath("$.message", containsString("once every 24 hours")));
+
+        // 3. User A checks in on Tree 2 on the same day -> SUCCESS (201 Created)
+        TreeCheckinRequest checkinReq2 = TreeCheckinRequest.builder()
+                .latitude(44.433000)
+                .longitude(26.101000)
+                .wateringLevel(WateringLevel.OPTIMAL)
+                .watered(true)
+                .build();
+
+        mockMvc.perform(post("/api/trees/" + tree2.getId() + "/check-ins")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(checkinReq2)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valid", is(true)));
+
+        // 4. User B checks in on Tree 1 on the same day -> SUCCESS (201 Created, per-user limit)
+        mockMvc.perform(post("/api/trees/" + tree1.getId() + "/check-ins")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(checkinReq1)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valid", is(true)));
+    }
+
+    @Test
+    @DisplayName("Should report check-in eligibility status and remaining cooldown")
+    void shouldReportCheckinStatusAndCooldown() throws Exception {
+        Tree tree = createApprovedTree(44.432000, 26.100000, "Magnolia x soulangeana (Magnolie)");
+        User user = createTestUser("status.user@example.ro", "Status User");
+        String token = jwtService.generateToken(user);
+
+        // Before check-in: status is canCheckin = true
+        mockMvc.perform(get("/api/trees/" + tree.getId() + "/check-ins/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canCheckin", is(true)))
+                .andExpect(jsonPath("$.remainingCooldownSeconds", is(0)));
+
+        // Perform valid check-in
+        TreeCheckinRequest request = TreeCheckinRequest.builder()
+                .latitude(44.432000)
+                .longitude(26.100000)
+                .wateringLevel(WateringLevel.OPTIMAL)
+                .watered(true)
+                .build();
+
+        mockMvc.perform(post("/api/trees/" + tree.getId() + "/check-ins")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        // After check-in: status is canCheckin = false with remaining cooldown
+        mockMvc.perform(get("/api/trees/" + tree.getId() + "/check-ins/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canCheckin", is(false)))
+                .andExpect(jsonPath("$.remainingCooldownSeconds", greaterThan(0)))
+                .andExpect(jsonPath("$.lastCheckinAt").exists())
+                .andExpect(jsonPath("$.nextAvailableCheckinAt").exists())
+                .andExpect(jsonPath("$.message", containsString("Check-in available in")));
     }
 }

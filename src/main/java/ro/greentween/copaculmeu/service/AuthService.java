@@ -45,9 +45,15 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        if (user.getStatus() == UserStatus.SUSPENDED) {
-            log.warn("Login attempt for suspended user: {}", normalizedEmail);
-            throw new BadCredentialsException("Account is suspended");
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            log.warn("Login attempt for non-active user ({}) with status: {}", normalizedEmail, user.getStatus());
+            if (user.getStatus() == UserStatus.UNCONFIRMED) {
+                throw new BadCredentialsException("Account is not activated");
+            } else if (user.getStatus() == UserStatus.SUSPENDED) {
+                throw new BadCredentialsException("Account is suspended");
+            } else {
+                throw new BadCredentialsException("Account is not active");
+            }
         }
 
         PasswordHasher hasher = PasswordHasherFactory.getHasher(user.getHashVersion());

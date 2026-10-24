@@ -2,9 +2,13 @@ package ro.greentween.copaculmeu.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import ro.greentween.copaculmeu.config.CacheNames;
 import ro.greentween.copaculmeu.data.dao.TreeSpeciesDao;
 import ro.greentween.copaculmeu.data.dto.TreeSpeciesCreateRequest;
 import ro.greentween.copaculmeu.data.dto.TreeSpeciesResponse;
@@ -20,7 +24,9 @@ import java.util.Locale;
 public class SpeciesService {
 
     private final TreeSpeciesDao treeSpeciesDao;
+    private final TreeCacheEvictionService treeCacheEvictionService;
 
+    @Cacheable(value = CacheNames.SPECIES_ALL, key = "'all'")
     @Transactional(readOnly = true)
     public List<TreeSpeciesResponse> getAllSpecies() {
         return treeSpeciesDao.findAllOrdered()
@@ -29,6 +35,7 @@ public class SpeciesService {
                 .toList();
     }
 
+    @Cacheable(value = CacheNames.SPECIES_SINGLE, key = "#id")
     @Transactional(readOnly = true)
     public TreeSpeciesResponse getSpeciesById(Long id) {
         TreeSpecies species = treeSpeciesDao.find(id);
@@ -38,6 +45,10 @@ public class SpeciesService {
         return TreeSpeciesResponse.fromEntity(species);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.SPECIES_ALL, allEntries = true),
+            @CacheEvict(value = CacheNames.SPECIES_ALLOWED, allEntries = true)
+    })
     @Transactional
     public TreeSpeciesResponse addSpecies(TreeSpeciesCreateRequest request) {
         String name = request.getName().trim();
@@ -53,6 +64,7 @@ public class SpeciesService {
                 .build();
 
         TreeSpecies saved = treeSpeciesDao.persist(species);
+        treeCacheEvictionService.evictSpeciesCaches();
         log.info("New tree species registered with ID {}: {}", saved.getId(), saved.getName());
         return TreeSpeciesResponse.fromEntity(saved);
     }
@@ -65,6 +77,7 @@ public class SpeciesService {
         }
     }
 
+    @Cacheable(value = CacheNames.SPECIES_ALLOWED, key = "#species.trim().toLowerCase()", condition = "#species != null && !#species.trim().isEmpty()")
     public boolean isSpeciesAllowed(String species) {
         if (!StringUtils.hasText(species)) {
             return false;

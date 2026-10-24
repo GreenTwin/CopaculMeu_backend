@@ -9,6 +9,8 @@ import tech.petrepopescu.common.data.dao.GenericDao;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class TreeCheckinDao extends GenericDao<TreeCheckin> {
@@ -31,6 +33,16 @@ public class TreeCheckinDao extends GenericDao<TreeCheckin> {
         filter.setCreatedAfter(since);
         filter.orderBy("createdAt");
         return get(filter);
+    }
+
+    public Optional<TreeCheckin> findLatestValidCheckinForUserAndTree(Long treeId, UUID userId) {
+        String jpql = "SELECT c FROM TreeCheckin c WHERE c.tree.id = :treeId AND c.user.id = :userId AND c.valid = true ORDER BY c.createdAt DESC";
+        return entityManager.createQuery(jpql, TreeCheckin.class)
+                .setParameter("treeId", treeId)
+                .setParameter("userId", userId)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst();
     }
 
     public List<TreeCheckin> findCheckinsWithProposedSpecies(Long treeId) {

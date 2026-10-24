@@ -15,13 +15,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import ro.greentween.copaculmeu.data.dto.CheckinStatusResponse;
 import ro.greentween.copaculmeu.data.dto.TreeCheckinRequest;
 import ro.greentween.copaculmeu.data.dto.TreeCheckinResponse;
 import ro.greentween.copaculmeu.data.dto.TreeCreateRequest;
 import ro.greentween.copaculmeu.data.dto.TreeRejectRequest;
 import ro.greentween.copaculmeu.data.dto.TreeResponse;
-import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.data.dto.TreeSpeciesResponse;
+import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.service.SpeciesService;
 import ro.greentween.copaculmeu.service.TreeCheckinService;
 import ro.greentween.copaculmeu.service.TreeService;
@@ -236,6 +237,23 @@ public class TreeController {
             @Parameter(description = "Tree unique ID", required = true) @PathVariable Long id
     ) {
         return ResponseEntity.ok(treeCheckinService.getCheckinsForTree(id));
+    }
+
+    @Operation(summary = "Check check-in availability for current user",
+            description = "Check if the authenticated user can check in on this tree under the 24-hour rate limit rule.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Check-in eligibility status"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Tree not found")
+    })
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/check-ins/status")
+    public ResponseEntity<CheckinStatusResponse> getCheckinStatus(
+            @Parameter(description = "Tree unique ID", required = true) @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return ResponseEntity.ok(treeCheckinService.getCheckinStatus(id, principal != null ? principal.getId() : null));
     }
 
     @Operation(summary = "Get predefined tree species",

@@ -8,6 +8,7 @@ import org.springframework.util.StringUtils;
 import ro.greentween.copaculmeu.data.dao.TreeCheckinDao;
 import ro.greentween.copaculmeu.data.dao.TreeDao;
 import ro.greentween.copaculmeu.data.dao.UserDao;
+import ro.greentween.copaculmeu.data.dto.CheckinStatusResponse;
 import ro.greentween.copaculmeu.data.dto.TreeCheckinRequest;
 import ro.greentween.copaculmeu.data.dto.TreeCheckinResponse;
 import ro.greentween.copaculmeu.data.enums.TreeStatus;
@@ -17,11 +18,13 @@ import ro.greentween.copaculmeu.data.model.User;
 import ro.greentween.copaculmeu.exception.ResourceNotFoundException;
 import ro.greentween.copaculmeu.util.GeoUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,10 +37,12 @@ public class TreeCheckinService {
     private final UserDao userDao;
     private final TreeCheckinDao treeCheckinDao;
     private final SpeciesService speciesService;
+    private final TreeCacheEvictionService treeCacheEvictionService;
 
     public static final double MAX_VALID_DEVIATION_METERS = 2.0;
     public static final int MIN_PROPOSALS_FOR_SPECIES_UPDATE = 5;
     public static final int GPS_AVERAGING_PAST_MONTHS = 3;
+    public static final int CHECKIN_COOLDOWN_HOURS = 24;
 
     @Transactional
     public TreeCheckinResponse checkIn(Long treeId, TreeCheckinRequest request, UUID userId) {
@@ -53,6 +58,23 @@ public class TreeCheckinService {
         User user = userDao.find(userId);
         if (user == null) {
             throw new IllegalStateException("User with id " + userId + " not found");
+        }
+
+        // 24-hour cooldown check: user can only check-in on the same tree once every 24 hours
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
+        Optional<TreeCheckin> lastCheckinOpt = treeCheckinDao.findLatestValidCheckinForUserAndTree(treeId, userId);
+        if (lastCheckinOpt.isPresent()) {
+            TreeCheckin lastCheckin = lastCheckinOpt.get();
+            LocalDateTime nextAllowed = lastCheckin.getCreatedAt().plusHours(CHECKIN_COOLDOWN_HOURS);
+            if (now.isBefore(nextAllowed)) {
+                Duration remaining = Duration.between(now, nextAllowed);
+                long hours = remaining.toHours();
+                long minutes = remaining.toMinutes() % 60;
+                String waitTime = hours > 0 ? (hours + "h " + minutes + "m") : (minutes + "m");
+                throw new IllegalArgumentException(
+                        "You can only check-in on this tree once every 24 hours. Next check-in available in " + waitTime + "."
+                );
+            }
         }
 
         if (StringUtils.hasText(request.getProposedSpecies())) {
@@ -125,6 +147,7 @@ public class TreeCheckinService {
             evaluateSpeciesProposals(tree);
 
             treeDao.persist(tree);
+            treeCacheEvictionService.evictTreeAndAreaCaches(treeId);
         }
 
         return TreeCheckinResponse.fromEntity(savedCheckin);
@@ -229,5 +252,53 @@ public class TreeCheckinService {
                 .stream()
                 .map(TreeCheckinResponse::fromEntity)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CheckinStatusResponse getCheckinStatus(Long treeId, UUID userId) {
+        Tree tree = treeDao.find(treeId);
+        if (tree == null) {
+            throw new ResourceNotFoundException("Tree with id " + treeId + " not found");
+        }
+
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("UTC"));
+        Optional<TreeCheckin> lastCheckinOpt = treeCheckinDao.findLatestValidCheckinForUserAndTree(treeId, userId);
+
+        if (lastCheckinOpt.isEmpty()) {
+            return CheckinStatusResponse.builder()
+                    .canCheckin(true)
+                    .treeId(treeId)
+                    .remainingCooldownSeconds(0L)
+                    .message("Check-in is available")
+                    .build();
+        }
+
+        TreeCheckin lastCheckin = lastCheckinOpt.get();
+        LocalDateTime nextAllowed = lastCheckin.getCreatedAt().plusHours(CHECKIN_COOLDOWN_HOURS);
+
+        if (now.isBefore(nextAllowed)) {
+            Duration remaining = Duration.between(now, nextAllowed);
+            long seconds = remaining.getSeconds();
+            long hours = remaining.toHours();
+            long minutes = remaining.toMinutes() % 60;
+            String waitTime = hours > 0 ? (hours + "h " + minutes + "m") : (minutes + "m");
+
+            return CheckinStatusResponse.builder()
+                    .canCheckin(false)
+                    .treeId(treeId)
+                    .lastCheckinAt(lastCheckin.getCreatedAt())
+                    .nextAvailableCheckinAt(nextAllowed)
+                    .remainingCooldownSeconds(seconds)
+                    .message("Check-in available in " + waitTime)
+                    .build();
+        } else {
+            return CheckinStatusResponse.builder()
+                    .canCheckin(true)
+                    .treeId(treeId)
+                    .lastCheckinAt(lastCheckin.getCreatedAt())
+                    .remainingCooldownSeconds(0L)
+                    .message("Check-in is available")
+                    .build();
+        }
     }
 }

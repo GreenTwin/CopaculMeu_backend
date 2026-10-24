@@ -83,10 +83,15 @@ class SpeciesControllerIntegrationTest {
     @DisplayName("Administrator should add new tree species to the database")
     @WithMockUser(roles = "ADMIN")
     void shouldAllowAdminToAddSpecies() throws Exception {
+        String uniqueSuffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        String speciesName = "Cedrus libani " + uniqueSuffix + " (Cedru de Liban)";
+        String scientificName = "Cedrus libani " + uniqueSuffix;
+        String commonName = "Cedru de Liban " + uniqueSuffix;
+
         TreeSpeciesCreateRequest request = TreeSpeciesCreateRequest.builder()
-                .name("Cedrus libani (Cedru de Liban)")
-                .scientificName("Cedrus libani")
-                .commonName("Cedru de Liban")
+                .name(speciesName)
+                .scientificName(scientificName)
+                .commonName(commonName)
                 .aliases("Lebanon cedar")
                 .build();
 
@@ -96,14 +101,14 @@ class SpeciesControllerIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.name", is("Cedrus libani (Cedru de Liban)")))
-                .andExpect(jsonPath("$.scientificName", is("Cedrus libani")))
-                .andExpect(jsonPath("$.commonName", is("Cedru de Liban")));
+                .andExpect(jsonPath("$.name", is(speciesName)))
+                .andExpect(jsonPath("$.scientificName", is(scientificName)))
+                .andExpect(jsonPath("$.commonName", is(commonName)));
 
         // Verify species is now in the list
         mockMvc.perform(get("/api/species"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name", hasItem("Cedrus libani (Cedru de Liban)")));
+                .andExpect(jsonPath("$[*].name", hasItem(speciesName)));
     }
 
     @Test

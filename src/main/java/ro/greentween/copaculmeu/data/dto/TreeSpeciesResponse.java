@@ -4,12 +4,16 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import ro.greentween.copaculmeu.data.model.TreeSpecies;
 
+import java.io.Serializable;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 @Schema(description = "Tree species item representation")
-public class TreeSpeciesResponse {
+public class TreeSpeciesResponse implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Schema(description = "Unique ID of the species", example = "1")
     private Long id;
