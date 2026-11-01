@@ -63,6 +63,7 @@ public class SecurityConfig {
                         // Public auth, user registration, and documentation endpoints
                         .requestMatchers("/api/auth/**", "/api/users/**").permitAll()
                         .requestMatchers("/scalar/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )

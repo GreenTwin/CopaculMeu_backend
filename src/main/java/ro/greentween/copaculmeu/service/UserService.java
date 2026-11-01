@@ -36,10 +36,10 @@ public class UserService {
     private final UserActivationCodeDao activationCodeDao;
     private final CodeEncryptorFactory codeEncryptorFactory;
 
-    @Value("${app.security.pepper:CopaculMeuPepper2026!#$TreeApp}")
+    @Value("${app.security.pepper}")
     private String pepper;
 
-    @Value("${app.security.activation-code-secret:CopaculMeuActivationCodeSecretKey2026!}")
+    @Value("${app.security.activation-code-secret}")
     private String activationSecret;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();

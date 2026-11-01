@@ -39,7 +39,7 @@ public class JwtService {
     private final RevokedTokenDao revokedTokenDao;
     private final UserDao userDao;
 
-    @Value("${app.security.jwt.secret:CopaculMeuUltraSecureJwtSecretKeyMustBeAtLeast256BitsLongForHmacSha256Security2026!}")
+    @Value("${app.security.jwt.secret}")
     private String jwtSecret;
 
     @Value("${app.security.jwt.expiration-seconds:86400}")

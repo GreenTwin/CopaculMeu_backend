@@ -32,7 +32,7 @@ public class AuthService {
     private final UserDao userDao;
     private final JwtService jwtService;
 
-    @Value("${app.security.pepper:CopaculMeuPepper2026!#$TreeApp}")
+    @Value("${app.security.pepper}")
     private String pepper;
 
     @Transactional(readOnly = true)

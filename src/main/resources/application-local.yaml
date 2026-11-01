@@ -15,3 +15,11 @@ spring:
   flyway:
     user: postgres
     password: test
+
+# Local-only security values (production values come from environment variables)
+app:
+  security:
+    pepper: CopaculMeuPepper2026!#$TreeApp
+    activation-code-secret: CopaculMeuActivationCodeSecretKey2026!
+    jwt:
+      secret: CopaculMeuUltraSecureJwtSecretKeyMustBeAtLeast256BitsLongForHmacSha256Security2026!

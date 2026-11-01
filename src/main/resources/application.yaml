@@ -1,18 +1,22 @@
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: copaculmeu
   profiles:
-    active: local
+    active: ${SPRING_PROFILES_ACTIVE:local}
   # Database connection
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/copacul_meu}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:test}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   # JPA and Hibernate
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       ddl-auto: none
 
@@ -23,6 +27,17 @@ spring:
     baseline-on-migrate: true
     baseline-version: '0'
     validate-on-migrate: true
+
+# Actuator: expose only the health endpoint (used by Railway healthchecks)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 # Springdoc OpenAPI configuration
 springdoc:
@@ -44,8 +59,8 @@ scalar:
 
 app:
   security:
-    pepper: CopaculMeuPepper2026!#$TreeApp
-    activation-code-secret: CopaculMeuActivationCodeSecretKey2026!
+    pepper: ${APP_SECURITY_PEPPER}
+    activation-code-secret: ${APP_SECURITY_ACTIVATION_CODE_SECRET}
     jwt:
-      secret: ${APP_JWT_SECRET:CopaculMeuUltraSecureJwtSecretKeyMustBeAtLeast256BitsLongForHmacSha256Security2026!}
+      secret: ${APP_JWT_SECRET}
       expiration-seconds: 86400
