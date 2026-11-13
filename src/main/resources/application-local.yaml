@@ -18,6 +18,9 @@ spring:
 
 # Local-only security values (production values come from environment variables)
 app:
+  auth:
+    google:
+      client-id: 1029297335817-skdptqienah01t0ve8it0fc7gcvtbkk7.apps.googleusercontent.com
   security:
     pepper: CopaculMeuPepper2026!#$TreeApp
     activation-code-secret: CopaculMeuActivationCodeSecretKey2026!

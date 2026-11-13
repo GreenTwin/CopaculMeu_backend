@@ -26,14 +26,20 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 512)
+    @Column(name = "password_hash", length = 512)
     private String passwordHash;
 
-    @Column(name = "salt", nullable = false, length = 1024)
+    @Column(name = "salt", length = 1024)
     private String salt;
 
-    @Column(name = "hash_version", nullable = false, length = 50)
+    @Column(name = "hash_version", length = 50)
     private String hashVersion;
+
+    @Column(name = "google_sub", length = 255)
+    private String googleSub;
+
+    @Column(name = "apple_sub", length = 255)
+    private String appleSub;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 50)
