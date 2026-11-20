@@ -222,7 +222,10 @@ class AuthControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(activationRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", equalTo(user.getId().toString())))
-                .andExpect(jsonPath("$.status", equalTo("ACTIVE")));
+                .andExpect(jsonPath("$.status", equalTo("PENDING_APPROVAL")));
+
+        // Admin approves account
+        userService.approveUser(user.getId());
 
         // Now login should succeed
         LoginRequest loginRequest = LoginRequest.builder()

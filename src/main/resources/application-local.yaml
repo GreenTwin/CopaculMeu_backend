@@ -18,6 +18,8 @@ spring:
 
 # Local-only security values (production values come from environment variables)
 app:
+  mail:
+    enabled: false
   auth:
     google:
       client-id: 1029297335817-skdptqienah01t0ve8it0fc7gcvtbkk7.apps.googleusercontent.com

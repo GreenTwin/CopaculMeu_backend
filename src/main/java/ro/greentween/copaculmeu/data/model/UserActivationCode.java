@@ -43,6 +43,10 @@ public class UserActivationCode {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "attempts", nullable = false)
+    @Builder.Default
+    private Integer attempts = 0;
+
     @PrePersist
     protected void onCreate() {
         if (this.id == null) {
@@ -51,5 +55,12 @@ public class UserActivationCode {
         if (this.createdAt == null) {
             this.createdAt = OffsetDateTime.now();
         }
+        if (this.attempts == null) {
+            this.attempts = 0;
+        }
+    }
+
+    public int getAttemptsCount() {
+        return attempts != null ? attempts : 0;
     }
 }
