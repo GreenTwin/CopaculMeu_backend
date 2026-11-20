@@ -58,6 +58,9 @@ scalar:
   dark-mode: true
 
 app:
+  auth:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
   security:
     pepper: ${APP_SECURITY_PEPPER}
     activation-code-secret: ${APP_SECURITY_ACTIVATION_CODE_SECRET}

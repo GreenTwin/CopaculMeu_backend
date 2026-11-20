@@ -30,6 +30,16 @@ public class UserDao extends GenericDao<User> {
         return findByEmail(email).isPresent();
     }
 
+    public Optional<User> findByGoogleSub(String googleSub) {
+        if (googleSub == null || googleSub.isBlank()) {
+            return Optional.empty();
+        }
+        UserFilter filter = new UserFilter();
+        filter.setGoogleSub(googleSub.trim());
+        List<User> users = get(filter);
+        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
     @Transactional
     public void deleteAll() {
         entityManager.createQuery("DELETE FROM User").executeUpdate();

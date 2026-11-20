@@ -17,11 +17,15 @@ import org.springframework.web.bind.annotation.*;
 import ro.greentween.copaculmeu.data.dto.AuthResponse;
 import ro.greentween.copaculmeu.data.dto.LoginRequest;
 import ro.greentween.copaculmeu.data.dto.LogoutResponse;
+import ro.greentween.copaculmeu.data.dto.SocialLoginRequest;
 import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
 import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.service.AuthService;
+import ro.greentween.copaculmeu.service.SocialAuthService;
 import ro.greentween.copaculmeu.service.UserService;
+import ro.greentween.copaculmeu.service.social.SocialNonceService;
+import tech.petrepopescu.common.utils.CookieUtil;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -31,6 +35,28 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final SocialAuthService socialAuthService;
+    private final SocialNonceService socialNonceService;
+
+    @PostMapping("/social/nonce")
+    @Operation(summary = "Issue a social sign-in nonce", description = "Returns a one-time nonce and sets it as an httpOnly cookie. The browser must pass that nonce to the identity provider.")
+    public ResponseEntity<java.util.Map<String, String>> issueSocialNonce(HttpServletResponse response) {
+        String nonce = socialNonceService.issue(response);
+        return ResponseEntity.ok(java.util.Map.of("nonce", nonce));
+    }
+
+    @PostMapping("/google")
+    @Operation(summary = "Sign in with Google", description = "Verifies a Google ID token and returns the application JWT. Requires the social_nonce cookie from POST /api/auth/social/nonce.")
+    public ResponseEntity<AuthResponse> loginWithGoogle(@Valid @RequestBody SocialLoginRequest request,
+                                                        HttpServletRequest httpRequest,
+                                                        HttpServletResponse response) {
+        String nonce = null;
+        var cookie = CookieUtil.getCookie(httpRequest, SocialNonceService.COOKIE_NAME);
+        if (cookie != null) {
+            nonce = cookie.getValue();
+        }
+        return ResponseEntity.ok(socialAuthService.loginWithGoogle(request.getIdToken(), nonce, response));
+    }
 
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticates user credentials and returns a JWT access token along with an HTTP-only secure cookie.")

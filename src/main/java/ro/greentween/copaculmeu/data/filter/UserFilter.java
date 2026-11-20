@@ -19,6 +19,8 @@ import java.util.UUID;
 public class UserFilter extends JPAFilter<User> {
     private UUID id;
     private String email;
+    private String googleSub;
+    private String appleSub;
     private UserRole role;
     private UserStatus status;
 
@@ -30,6 +32,12 @@ public class UserFilter extends JPAFilter<User> {
         }
         if (email != null) {
             predicates.add(equalsIgnoreCase(criteriaBuilder, root, "email", email.trim()));
+        }
+        if (googleSub != null) {
+            predicates.add(equals(criteriaBuilder, root, "googleSub", googleSub));
+        }
+        if (appleSub != null) {
+            predicates.add(equals(criteriaBuilder, root, "appleSub", appleSub));
         }
         if (role != null) {
             predicates.add(equals(criteriaBuilder, root, "role", role));

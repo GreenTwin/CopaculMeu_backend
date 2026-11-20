@@ -56,6 +56,13 @@ public class AuthService {
             }
         }
 
+        if (!org.springframework.util.StringUtils.hasText(user.getPasswordHash())
+                || !org.springframework.util.StringUtils.hasText(user.getSalt())
+                || !org.springframework.util.StringUtils.hasText(user.getHashVersion())) {
+            log.warn("Password login attempt for account without a password: {}", normalizedEmail);
+            throw new BadCredentialsException("Invalid email or password");
+        }
+
         PasswordHasher hasher = PasswordHasherFactory.getHasher(user.getHashVersion());
         try {
             String computedHash = hasher.generateHashForPassword(request.getPassword(), user.getSalt(), pepper);
@@ -73,6 +80,11 @@ public class AuthService {
             throw new IllegalStateException("Authentication service error", e);
         }
 
+        log.info("User {} successfully logged in", normalizedEmail);
+        return issueSession(user, response);
+    }
+
+    public AuthResponse issueSession(User user, HttpServletResponse response) {
         String token = jwtService.generateToken(user);
 
         if (response != null) {
@@ -81,8 +93,6 @@ public class AuthService {
             cookie.setMaxAge((int) jwtService.getExpirationSeconds());
             response.addCookie(cookie);
         }
-
-        log.info("User {} successfully logged in", normalizedEmail);
 
         return AuthResponse.builder()
                 .accessToken(token)

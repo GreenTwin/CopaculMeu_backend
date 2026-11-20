@@ -1,0 +1,9 @@
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN salt DROP NOT NULL;
+ALTER TABLE users ALTER COLUMN hash_version DROP NOT NULL;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub VARCHAR(255);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users (google_sub);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_apple_sub ON users (apple_sub);
