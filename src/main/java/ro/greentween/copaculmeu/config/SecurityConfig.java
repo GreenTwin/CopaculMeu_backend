@@ -48,18 +48,25 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // All admin endpoints under /api/admin/** require ADMIN role
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // Species endpoints: reading is public, creating species requires ADMIN
-                        .requestMatchers(HttpMethod.POST, "/api/species/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/species/**", "/api/admin/species/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/species/**").permitAll()
                         // Tree direct creation, proposals management, and review actions require ADMIN
-                        .requestMatchers(HttpMethod.POST, "/api/trees").hasRole("ADMIN")
-                        .requestMatchers("/api/trees/proposals/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/trees/*/approve").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/trees/*/reject").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/trees", "/api/admin/trees").hasRole("ADMIN")
+                        .requestMatchers("/api/trees/proposals/**", "/api/admin/trees/proposals/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/trees/*/approve", "/api/admin/trees/*/approve").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/trees/*/reject", "/api/admin/trees/*/reject").hasRole("ADMIN")
                         // Proposing trees requires authenticated user
                         .requestMatchers(HttpMethod.POST, "/api/trees/propose").authenticated()
                         // Public tree reading endpoints
                         .requestMatchers(HttpMethod.GET, "/api/trees/**").permitAll()
+                        // Admin user management endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/", "/api/users/paged", "/api/admin/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/users/*/approve", "/api/users/*/confirm", "/api/admin/users/*/approve", "/api/admin/users/*/confirm", "/api/users/*/status", "/api/admin/users/*/status").hasRole("ADMIN")
+                        // Admin email template management endpoints
+                        .requestMatchers("/api/admin/email-templates/**", "/api/email-templates/**").hasRole("ADMIN")
                         // Public auth, user registration, and documentation endpoints
                         .requestMatchers("/api/auth/**", "/api/users/**").permitAll()
                         .requestMatchers("/scalar/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()

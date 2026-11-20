@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import ro.greentween.copaculmeu.data.dto.ForgotPasswordRequest;
+import ro.greentween.copaculmeu.data.dto.MessageResponse;
+import ro.greentween.copaculmeu.data.dto.ResetPasswordRequest;
 import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
@@ -51,6 +54,25 @@ public class UserController {
     @PostMapping("/activate")
     public ResponseEntity<UserResponse> activate(@Valid @RequestBody UserActivationRequest request) {
         return ResponseEntity.ok(userService.activateUser(request));
+    }
+
+    @Operation(summary = "Forgot password request", description = "Generates a reset code and dispatches a password reset email using the configured template.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password reset code dispatched if account exists")
+    })
+    @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(userService.forgotPassword(request));
+    }
+
+    @Operation(summary = "Reset password", description = "Resets user password using the code sent via email.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired reset code, or invalid password")
+    })
+    @PostMapping("/reset-password")
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(userService.resetPassword(request));
     }
 
     @Operation(summary = "Register a new user", description = "Creates a new user account with encrypted password, generates an activation code, and saves the code using the configured CodeEncryptor version.")

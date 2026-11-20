@@ -40,27 +40,6 @@ public class TreeController {
     private final TreeCheckinService treeCheckinService;
     private final SpeciesService speciesService;
 
-    @Operation(summary = "Register a new tree (Admin only)",
-            description = "Directly add a new tree (Administrator privileges required). The tree is automatically approved.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Tree created successfully",
-                    content = @Content(schema = @Schema(implementation = TreeResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Validation error or invalid coordinate bounds"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator role required")
-    })
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping
-    public ResponseEntity<TreeResponse> createTree(@Valid @RequestBody TreeCreateRequest request) {
-        TreeResponse response = treeService.createTree(request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}")
-                .buildAndExpand(response.getId())
-                .toUri();
-        return ResponseEntity.created(location).body(response);
-    }
-
     @Operation(summary = "Propose a new tree (Users)",
             description = "Submit a proposed tree for administrative review (Authenticated users). The tree will be assigned PENDING_APPROVAL status until an administrator approves it.")
     @SecurityRequirement(name = "bearerAuth")
@@ -82,58 +61,6 @@ public class TreeController {
                 .buildAndExpand(response.getId())
                 .toUri();
         return ResponseEntity.created(location).body(response);
-    }
-
-    @Operation(summary = "List pending tree proposals (Admin only)",
-            description = "Retrieve all proposed trees that are awaiting administrative approval.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "List of pending tree proposals"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator role required")
-    })
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/proposals")
-    public ResponseEntity<List<TreeResponse>> getPendingProposals() {
-        return ResponseEntity.ok(treeService.getPendingProposals());
-    }
-
-    @Operation(summary = "Approve tree proposal (Admin only)",
-            description = "Approve a proposed tree. The tree transitions to APPROVED status and becomes visible on public map queries.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Tree proposal approved"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator role required"),
-            @ApiResponse(responseCode = "404", description = "Tree proposal not found")
-    })
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/{id}/approve")
-    public ResponseEntity<TreeResponse> approveTree(
-            @Parameter(description = "Tree unique ID", required = true) @PathVariable Long id,
-            @AuthenticationPrincipal UserPrincipal principal
-    ) {
-        return ResponseEntity.ok(treeService.approveTreeProposal(id, principal != null ? principal.getId() : null));
-    }
-
-    @Operation(summary = "Reject tree proposal (Admin only)",
-            description = "Reject a proposed tree with an optional explanation reason.")
-    @SecurityRequirement(name = "bearerAuth")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Tree proposal rejected"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator role required"),
-            @ApiResponse(responseCode = "404", description = "Tree proposal not found")
-    })
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/{id}/reject")
-    public ResponseEntity<TreeResponse> rejectTree(
-            @Parameter(description = "Tree unique ID", required = true) @PathVariable Long id,
-            @RequestBody(required = false) TreeRejectRequest rejectRequest,
-            @AuthenticationPrincipal UserPrincipal principal
-    ) {
-        String reason = rejectRequest != null ? rejectRequest.getReason() : null;
-        return ResponseEntity.ok(treeService.rejectTreeProposal(id, principal != null ? principal.getId() : null, reason));
     }
 
     @Operation(summary = "Query trees", description = "Retrieve approved trees with optional area filters. If bounding box parameters (minLat, maxLat, minLng, maxLng) or radial parameters (lat, lng, radiusMeters) are provided, results are filtered accordingly. Otherwise, all approved trees are returned.")
