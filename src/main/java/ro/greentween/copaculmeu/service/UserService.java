@@ -47,6 +47,7 @@ public class UserService {
     private String activationSecret;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    public static final int MAX_CODE_ATTEMPTS = 10;
 
     @Transactional
     public UserResponse registerUser(UserRegisterRequest request) {
@@ -109,7 +110,7 @@ public class UserService {
         return UserResponse.fromEntity(user);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public UserResponse activateUser(UserActivationRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         User user = userDao.findByEmail(normalizedEmail)
@@ -131,11 +132,25 @@ public class UserService {
         List<UserActivationCode> codes = activationCodeDao.findByUserId(user.getId());
         OffsetDateTime now = OffsetDateTime.now();
 
-        UserActivationCode matchedCode = null;
-        for (UserActivationCode activationCode : codes) {
-            if (activationCode.getUsedAt() != null || activationCode.getExpiresAt().isBefore(now)) {
-                continue;
+        boolean hasExhaustedCode = codes.stream()
+                .anyMatch(c -> c.getAttemptsCount() >= MAX_CODE_ATTEMPTS && c.getUsedAt() == null);
+
+        List<UserActivationCode> activeCodes = codes.stream()
+                .filter(c -> c.getUsedAt() == null && c.getExpiresAt().isAfter(now) && c.getAttemptsCount() < MAX_CODE_ATTEMPTS)
+                .toList();
+
+        if (activeCodes.isEmpty()) {
+            if (hasExhaustedCode) {
+                throw new IllegalArgumentException("Maximum verification attempts (10) exceeded. Please request a new code.");
             }
+            throw new IllegalArgumentException("Invalid or expired activation code");
+        }
+
+        UserActivationCode matchedCode = null;
+        UserActivationCode activeCodeToIncrement = null;
+
+        for (UserActivationCode activationCode : activeCodes) {
+            activeCodeToIncrement = activationCode;
 
             try {
                 CodeEncryptor codeEncryptor = codeEncryptorFactory.getEncryptor(activationCode.getEncryptorVersion());
@@ -150,9 +165,20 @@ public class UserService {
         }
 
         if (matchedCode == null) {
+            if (activeCodeToIncrement != null) {
+                int newAttempts = activeCodeToIncrement.getAttemptsCount() + 1;
+                activeCodeToIncrement.setAttempts(newAttempts);
+                if (newAttempts >= MAX_CODE_ATTEMPTS) {
+                    activeCodeToIncrement.setExpiresAt(now);
+                    activationCodeDao.update(activeCodeToIncrement);
+                    throw new IllegalArgumentException("Maximum verification attempts (10) exceeded. Please request a new code.");
+                }
+                activationCodeDao.update(activeCodeToIncrement);
+            }
             throw new IllegalArgumentException("Invalid or expired activation code");
         }
 
+        matchedCode.setAttempts(matchedCode.getAttemptsCount() + 1);
         matchedCode.setUsedAt(now);
         activationCodeDao.update(matchedCode);
 
@@ -223,7 +249,7 @@ public class UserService {
         if (user.getStatus() == UserStatus.SUSPENDED) {
             throw new IllegalStateException("Cannot approve a suspended user account");
         }
-        if (user.getStatus() != UserStatus.UNCONFIRMED) {
+        if (user.getStatus() != UserStatus.UNCONFIRMED && user.getStatus() != UserStatus.PENDING_APPROVAL) {
             throw new IllegalStateException(
                     "Only unconfirmed user accounts can be approved. Current status: " + user.getStatus());
         }
@@ -269,7 +295,7 @@ public class UserService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public MessageResponse resetPassword(ResetPasswordRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         User user = userDao.findByEmail(normalizedEmail)
@@ -282,11 +308,25 @@ public class UserService {
         List<UserActivationCode> codes = activationCodeDao.findByUserId(user.getId());
         OffsetDateTime now = OffsetDateTime.now();
 
-        UserActivationCode matchedCode = null;
-        for (UserActivationCode code : codes) {
-            if (code.getUsedAt() != null || code.getExpiresAt().isBefore(now)) {
-                continue;
+        boolean hasExhaustedCode = codes.stream()
+                .anyMatch(c -> c.getAttemptsCount() >= MAX_CODE_ATTEMPTS && c.getUsedAt() == null);
+
+        List<UserActivationCode> activeCodes = codes.stream()
+                .filter(c -> c.getUsedAt() == null && c.getExpiresAt().isAfter(now) && c.getAttemptsCount() < MAX_CODE_ATTEMPTS)
+                .toList();
+
+        if (activeCodes.isEmpty()) {
+            if (hasExhaustedCode) {
+                throw new IllegalArgumentException("Maximum verification attempts (10) exceeded. Please request a new code.");
             }
+            throw new IllegalArgumentException("Invalid or expired password reset code");
+        }
+
+        UserActivationCode matchedCode = null;
+        UserActivationCode activeCodeToIncrement = null;
+
+        for (UserActivationCode code : activeCodes) {
+            activeCodeToIncrement = code;
 
             try {
                 CodeEncryptor codeEncryptor = codeEncryptorFactory.getEncryptor(code.getEncryptorVersion());
@@ -301,9 +341,20 @@ public class UserService {
         }
 
         if (matchedCode == null) {
+            if (activeCodeToIncrement != null) {
+                int newAttempts = activeCodeToIncrement.getAttemptsCount() + 1;
+                activeCodeToIncrement.setAttempts(newAttempts);
+                if (newAttempts >= MAX_CODE_ATTEMPTS) {
+                    activeCodeToIncrement.setExpiresAt(now);
+                    activationCodeDao.update(activeCodeToIncrement);
+                    throw new IllegalArgumentException("Maximum verification attempts (10) exceeded. Please request a new code.");
+                }
+                activationCodeDao.update(activeCodeToIncrement);
+            }
             throw new IllegalArgumentException("Invalid or expired password reset code");
         }
 
+        matchedCode.setAttempts(matchedCode.getAttemptsCount() + 1);
         matchedCode.setUsedAt(now);
         activationCodeDao.update(matchedCode);
 

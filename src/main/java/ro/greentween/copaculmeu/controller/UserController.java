@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import ro.greentween.copaculmeu.data.dto.ForgotPasswordRequest;
@@ -16,6 +17,8 @@ import ro.greentween.copaculmeu.data.dto.ResetPasswordRequest;
 import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
+import ro.greentween.copaculmeu.data.enums.UserRole;
+import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.service.UserService;
 
 import java.net.URI;
@@ -98,8 +101,15 @@ public class UserController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(
-            @Parameter(description = "User unique identifier (UUID)", required = true) @PathVariable UUID id
+            @Parameter(description = "User unique identifier (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ResponseEntity.ok(userService.getUserById(id));
+        UserResponse response = userService.getUserById(id);
+        boolean isOwner = principal != null && principal.getId().equals(id);
+        boolean isAdmin = principal != null && principal.getRole() == UserRole.ADMIN;
+        if (!isOwner && !isAdmin) {
+            response.setEmail(null);
+        }
+        return ResponseEntity.ok(response);
     }
 }

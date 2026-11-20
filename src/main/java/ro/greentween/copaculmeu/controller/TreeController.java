@@ -78,10 +78,25 @@ public class TreeController {
             @Parameter(description = "Radius in meters for radial search (e.g. 500)") @RequestParam(required = false) Double radiusMeters
     ) {
         if (minLat != null && maxLat != null && minLng != null && maxLng != null) {
+            if (minLat < -90.0 || maxLat > 90.0 || minLat > maxLat) {
+                throw new IllegalArgumentException("Latitude coordinates must be between -90 and 90, with minLat <= maxLat");
+            }
+            if (minLng < -180.0 || maxLng > 180.0 || minLng > maxLng) {
+                throw new IllegalArgumentException("Longitude coordinates must be between -180 and 180, with minLng <= maxLng");
+            }
             return ResponseEntity.ok(treeService.getTreesInBoundingBox(minLat, maxLat, minLng, maxLng));
         }
 
         if (lat != null && lng != null && radiusMeters != null) {
+            if (lat < -90.0 || lat > 90.0) {
+                throw new IllegalArgumentException("Latitude must be between -90 and 90");
+            }
+            if (lng < -180.0 || lng > 180.0) {
+                throw new IllegalArgumentException("Longitude must be between -180 and 180");
+            }
+            if (radiusMeters <= 0 || radiusMeters > 500_000.0) {
+                throw new IllegalArgumentException("radiusMeters must be positive and not exceed 500,000 meters");
+            }
             return ResponseEntity.ok(treeService.getTreesInRadius(lat, lng, radiusMeters));
         }
 

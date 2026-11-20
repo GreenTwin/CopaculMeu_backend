@@ -34,6 +34,8 @@ public final class CookieUtil {
         Cookie newCookie = new Cookie(name, value);
         newCookie.setHttpOnly(true);
         newCookie.setSecure(true);
+        newCookie.setPath("/");
+        newCookie.setAttribute("SameSite", "Lax");
         return newCookie;
     }
 }

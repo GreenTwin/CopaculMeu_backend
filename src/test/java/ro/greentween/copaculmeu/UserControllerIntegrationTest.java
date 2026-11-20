@@ -337,4 +337,53 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("ACTIVE")));
     }
+
+    @Test
+    @DisplayName("Anonymous request to GET /api/users/{id} redacts email address")
+    void anonymousUserRetrievingProfileGetsMaskedEmail() throws Exception {
+        UserResponse user = userService.registerUser(UserRegisterRequest.builder()
+                .email("privacy.test@example.ro")
+                .password("Password123!")
+                .name("Privacy User")
+                .build());
+
+        mockMvc.perform(get("/api/users/" + user.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(user.getId().toString())))
+                .andExpect(jsonPath("$.name", is("Privacy User")))
+                .andExpect(jsonPath("$.email").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Allow 10 tries per code, after which submissions are rejected and user must request a new code")
+    void allowTenTriesPerCodeThenRejectSubmissions() throws Exception {
+        UserResponse user = userService.registerUser(UserRegisterRequest.builder()
+                .email("rate.limit@example.ro")
+                .password("Password123!")
+                .name("Rate Limit Target")
+                .build());
+
+        // Attempts 1 through 9 fail with invalid code
+        for (int i = 1; i <= 9; i++) {
+            mockMvc.perform(post("/api/users/activate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"rate.limit@example.ro\",\"code\":\"00000" + i + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", is("Invalid or expired activation code")));
+        }
+
+        // 10th attempt reaches the 10-try limit and invalidates the code
+        mockMvc.perform(post("/api/users/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"rate.limit@example.ro\",\"code\":\"000010\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Maximum verification attempts (10) exceeded")));
+
+        // 11th attempt (new submission) is not taken into consideration
+        mockMvc.perform(post("/api/users/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"rate.limit@example.ro\",\"code\":\"000011\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Maximum verification attempts (10) exceeded")));
+    }
 }
