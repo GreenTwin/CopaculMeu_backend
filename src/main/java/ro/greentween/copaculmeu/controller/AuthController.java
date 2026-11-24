@@ -15,8 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import ro.greentween.copaculmeu.data.dto.AuthResponse;
+import ro.greentween.copaculmeu.data.dto.ForgotPasswordRequest;
 import ro.greentween.copaculmeu.data.dto.LoginRequest;
 import ro.greentween.copaculmeu.data.dto.LogoutResponse;
+import ro.greentween.copaculmeu.data.dto.MessageResponse;
+import ro.greentween.copaculmeu.data.dto.ResetPasswordRequest;
 import ro.greentween.copaculmeu.data.dto.SocialLoginRequest;
 import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
@@ -81,6 +84,27 @@ public class AuthController {
     public ResponseEntity<UserResponse> activate(@Valid @RequestBody UserActivationRequest request) {
         UserResponse response = userService.activateUser(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password request", description = "Generates a reset code and dispatches a password reset email using the configured template.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset code dispatched if account exists",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class)))
+    })
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(userService.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Resets user password using the code sent via email.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = MessageResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired reset code, or invalid password")
+    })
+    public ResponseEntity<MessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(userService.resetPassword(request));
     }
 
     @PostMapping("/logout")

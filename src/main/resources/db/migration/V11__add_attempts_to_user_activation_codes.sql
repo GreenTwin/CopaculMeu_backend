@@ -1,0 +1,1 @@
+ALTER TABLE user_activation_codes ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;

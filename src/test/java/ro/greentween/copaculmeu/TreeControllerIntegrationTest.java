@@ -308,4 +308,25 @@ class TreeControllerIntegrationTest {
                 .andExpect(jsonPath("$.locationDescription").doesNotExist())
                 .andExpect(jsonPath("$.notes").doesNotExist());
     }
+
+    @Test
+    @DisplayName("Should reject tree query with invalid coordinates or excessive radius")
+    void shouldRejectQueryWithInvalidCoordinatesOrExcessiveRadius() throws Exception {
+        // Latitude out of bounds
+        mockMvc.perform(get("/api/trees")
+                        .param("minLat", "-95.0")
+                        .param("maxLat", "45.0")
+                        .param("minLng", "20.0")
+                        .param("maxLng", "25.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Latitude coordinates must be between -90 and 90")));
+
+        // Excessive radius > 500,000 meters
+        mockMvc.perform(get("/api/trees")
+                        .param("lat", "44.4323")
+                        .param("lng", "26.1063")
+                        .param("radiusMeters", "600000.0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("radiusMeters must be positive and not exceed 500,000 meters")));
+    }
 }

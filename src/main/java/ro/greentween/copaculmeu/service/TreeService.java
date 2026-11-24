@@ -60,7 +60,7 @@ public class TreeService {
     @Transactional
     public TreeResponse proposeTree(TreeCreateRequest request, UUID userId) {
         Tree tree = buildTreeEntity(request);
-        tree.setStatus(TreeStatus.APPROVED);
+        tree.setStatus(TreeStatus.PENDING_APPROVAL);
 
         if (userId != null) {
             User user = userDao.find(userId);
