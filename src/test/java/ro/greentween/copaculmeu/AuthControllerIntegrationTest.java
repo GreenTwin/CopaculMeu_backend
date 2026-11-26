@@ -22,6 +22,7 @@ import ro.greentween.copaculmeu.data.dto.UserActivationRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
 import ro.greentween.copaculmeu.data.enums.UserStatus;
+import ro.greentween.copaculmeu.data.model.User;
 import ro.greentween.copaculmeu.data.model.UserActivationCode;
 import ro.greentween.copaculmeu.service.JwtService;
 import ro.greentween.copaculmeu.service.UserService;
@@ -344,5 +345,53 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.message", equalTo("Logged out successfully")));
 
         assertThat(jwtService.isTokenValid(token)).isFalse();
+    }
+
+    @Test
+    void login_success_setsLastLoginAtAndOmitsSecrets() throws Exception {
+        UserResponse registered = userService.registerUser(UserRegisterRequest.builder()
+                .email("login.success@example.ro")
+                .password("SecurePass123!")
+                .name("Login Success")
+                .build());
+        userService.setUserStatus(registered.getId(), UserStatus.ACTIVE);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(LoginRequest.builder()
+                                .email("login.success@example.ro")
+                                .password("SecurePass123!")
+                                .build())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.lastLoginAt", notNullValue()))
+                .andExpect(jsonPath("$.user.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.user.salt").doesNotExist())
+                .andExpect(jsonPath("$.user.hashVersion").doesNotExist())
+                .andExpect(jsonPath("$.user.googleSub").doesNotExist())
+                .andExpect(jsonPath("$.user.appleSub").doesNotExist());
+
+        User stored = userDao.findByEmail("login.success@example.ro").orElseThrow();
+        assertThat(stored.getLastLoginAt()).isNotNull();
+    }
+
+    @Test
+    void login_failure_leavesLastLoginAtUnset() throws Exception {
+        UserResponse registered = userService.registerUser(UserRegisterRequest.builder()
+                .email("login.fail@example.ro")
+                .password("SecurePass123!")
+                .name("Login Fail")
+                .build());
+        userService.setUserStatus(registered.getId(), UserStatus.ACTIVE);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(LoginRequest.builder()
+                                .email("login.fail@example.ro")
+                                .password("WrongPassword123!")
+                                .build())))
+                .andExpect(status().isUnauthorized());
+
+        User stored = userDao.findByEmail("login.fail@example.ro").orElseThrow();
+        assertThat(stored.getLastLoginAt()).isNull();
     }
 }

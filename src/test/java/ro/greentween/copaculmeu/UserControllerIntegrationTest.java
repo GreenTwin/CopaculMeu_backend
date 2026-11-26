@@ -3,6 +3,7 @@ package ro.greentween.copaculmeu;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,27 +13,39 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.support.TransactionTemplate;
+import ro.greentween.copaculmeu.data.dao.TreeDao;
 import ro.greentween.copaculmeu.data.dao.UserActivationCodeDao;
 import ro.greentween.copaculmeu.data.dao.UserDao;
+import ro.greentween.copaculmeu.data.dto.AdminUserUpdateRequest;
 import ro.greentween.copaculmeu.data.dto.LoginRequest;
 import ro.greentween.copaculmeu.data.dto.UserRegisterRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
+import ro.greentween.copaculmeu.data.enums.HealthLevel;
+import ro.greentween.copaculmeu.data.enums.UserRole;
 import ro.greentween.copaculmeu.data.enums.UserStatus;
+import ro.greentween.copaculmeu.data.model.Tree;
 import ro.greentween.copaculmeu.data.model.User;
 import ro.greentween.copaculmeu.data.model.UserActivationCode;
+import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.service.UserService;
 import ro.greentween.copaculmeu.service.crypto.CodeEncryptor;
 import ro.greentween.copaculmeu.service.crypto.CodeEncryptorFactory;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -48,6 +61,15 @@ class UserControllerIntegrationTest {
 
     @Autowired
     private UserDao userDao;
+
+    @Autowired
+    private TreeDao treeDao;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Autowired
     private UserActivationCodeDao activationCodeDao;
@@ -385,5 +407,231 @@ class UserControllerIntegrationTest {
                         .content("{\"email\":\"rate.limit@example.ro\",\"code\":\"000011\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("Maximum verification attempts (10) exceeded")));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminList_returnsLoginCreatedAtTreeCountAndRoleWithoutSecrets() throws Exception {
+        UserResponse planterResponse = register("planter@example.ro", "Planter");
+        UserResponse spectatorResponse = register("spectator@example.ro", "Spectator");
+        User planter = userDao.find(planterResponse.getId());
+        User spectator = userDao.find(spectatorResponse.getId());
+        planter.setLastLoginAt(LocalDateTime.of(2026, 11, 1, 12, 0));
+        userDao.update(planter);
+        List<Tree> created = new ArrayList<>();
+        try {
+            created.add(saveTree(planter, null));
+            created.add(saveTree(planter, spectator));
+
+            mockMvc.perform(get("/api/admin/users").param("size", "20"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[?(@.email == 'planter@example.ro')].treesAdded", contains(2)))
+                    .andExpect(jsonPath("$.content[?(@.email == 'planter@example.ro')].role", contains("USER")))
+                    .andExpect(jsonPath("$.content[?(@.email == 'planter@example.ro')].createdAt", not(empty())))
+                    .andExpect(jsonPath("$.content[?(@.email == 'planter@example.ro')].lastLoginAt", not(empty())))
+                    .andExpect(jsonPath("$.content[?(@.email == 'spectator@example.ro')].treesAdded", contains(0)))
+                    .andExpect(jsonPath("$.content[?(@.email == 'spectator@example.ro')].role", contains("USER")))
+                    .andExpect(jsonPath("$.content[?(@.email == 'spectator@example.ro')].createdAt", not(empty())))
+                    .andExpect(jsonPath("$.content[?(@.email == 'spectator@example.ro')].lastLoginAt", hasSize(0)))
+                    .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].salt").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].hashVersion").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].googleSub").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].appleSub").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].passwordHash").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].salt").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].hashVersion").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].googleSub").doesNotExist())
+                    .andExpect(jsonPath("$.content[1].appleSub").doesNotExist());
+        } finally {
+            created.forEach(treeDao::delete);
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminList_noUsers_returnsEmptyPage() throws Exception {
+        mockMvc.perform(get("/api/admin/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void adminUsers_missingToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/users")).andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/api/admin/users/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ana\"}"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(delete("/api/admin/users/" + UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void adminUsers_signedInUser_returns403() throws Exception {
+        UUID id = UUID.randomUUID();
+        mockMvc.perform(get("/api/admin/users")).andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/admin/users/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Ana\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/admin/users/" + id)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminEdit_updatesNameAndRoleWithoutSecrets() throws Exception {
+        UserResponse registered = register("editable@example.ro", "Old Name");
+
+        mockMvc.perform(put("/api/admin/users/" + registered.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AdminUserUpdateRequest("New Name", "ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("New Name")))
+                .andExpect(jsonPath("$.role", is("ADMIN")))
+                .andExpect(jsonPath("$.treesAdded", is(0)))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.salt").doesNotExist())
+                .andExpect(jsonPath("$.hashVersion").doesNotExist())
+                .andExpect(jsonPath("$.googleSub").doesNotExist())
+                .andExpect(jsonPath("$.appleSub").doesNotExist());
+
+        User stored = userDao.find(registered.getId());
+        assertThat(stored.getRole()).isEqualTo(UserRole.ADMIN);
+        assertThat(stored.getName()).isEqualTo("New Name");
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminEdit_unknownUser_returns404() throws Exception {
+        mockMvc.perform(put("/api/admin/users/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Missing\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminEdit_invalidRole_returns400() throws Exception {
+        UserResponse registered = register("invalid-role@example.ro", "Keep");
+
+        mockMvc.perform(put("/api/admin/users/" + registered.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"MODERATOR\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userDao.find(registered.getId()).getRole()).isEqualTo(UserRole.USER);
+    }
+
+    @Test
+    void adminEdit_ownRole_returns400AndKeepsRole() throws Exception {
+        User admin = adminUser("self.role@example.ro", "Self");
+
+        mockMvc.perform(put("/api/admin/users/" + admin.getId())
+                        .with(user(UserPrincipal.fromEntity(admin)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"USER\"}"))
+                .andExpect(status().isBadRequest());
+        assertThat(userDao.find(admin.getId()).getRole()).isEqualTo(UserRole.ADMIN);
+
+        mockMvc.perform(put("/api/admin/users/" + admin.getId())
+                        .with(user(UserPrincipal.fromEntity(userDao.find(admin.getId()))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed Self\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Renamed Self")))
+                .andExpect(jsonPath("$.role", is("ADMIN")));
+        assertThat(userDao.find(admin.getId()).getRole()).isEqualTo(UserRole.ADMIN);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminRemove_deletesUserAndKeepsTrees() throws Exception {
+        UserResponse registered = register("removed@example.ro", "Removed");
+        User person = userDao.find(registered.getId());
+        Tree tree = saveTree(person, person);
+        try {
+            mockMvc.perform(delete("/api/admin/users/" + person.getId()))
+                    .andExpect(status().isNoContent())
+                    .andExpect(content().string(""));
+
+            assertThat(userDao.find(person.getId())).isNull();
+            Object[] links = new TransactionTemplate(transactionManager).execute(status ->
+                    (Object[]) entityManager.createNativeQuery(
+                                    "SELECT proposed_by_user_id, reviewed_by_user_id FROM trees WHERE id = :id")
+                            .setParameter("id", tree.getId())
+                            .getSingleResult());
+            assertThat(links[0]).isNull();
+            assertThat(links[1]).isNull();
+        } finally {
+            treeDao.delete(treeDao.find(tree.getId()));
+        }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminRemove_unknownUser_returns404() throws Exception {
+        mockMvc.perform(delete("/api/admin/users/" + UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminRemove_self_returns400AndKeepsUser() throws Exception {
+        User admin = adminUser("self.delete@example.ro", "Stay");
+
+        mockMvc.perform(delete("/api/admin/users/" + admin.getId())
+                        .with(user(UserPrincipal.fromEntity(admin))))
+                .andExpect(status().isBadRequest());
+
+        assertThat(userDao.find(admin.getId())).isNotNull();
+    }
+
+    @Test
+    void publicProfile_omitsLastLoginAtAndSecrets() throws Exception {
+        UserResponse registered = register("public@example.ro", "Public");
+        User person = userDao.find(registered.getId());
+        person.setLastLoginAt(LocalDateTime.of(2026, 11, 2, 8, 30));
+        userDao.update(person);
+
+        mockMvc.perform(get("/api/users/" + person.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastLoginAt").doesNotExist())
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.salt").doesNotExist())
+                .andExpect(jsonPath("$.hashVersion").doesNotExist())
+                .andExpect(jsonPath("$.googleSub").doesNotExist())
+                .andExpect(jsonPath("$.appleSub").doesNotExist())
+                .andExpect(jsonPath("$.treesAdded").doesNotExist());
+    }
+
+    private UserResponse register(String email, String name) {
+        return userService.registerUser(UserRegisterRequest.builder()
+                .email(email)
+                .password("Password123!")
+                .name(name)
+                .build());
+    }
+
+    private User adminUser(String email, String name) {
+        UserResponse registered = register(email, name);
+        User admin = userDao.find(registered.getId());
+        admin.setRole(UserRole.ADMIN);
+        admin.setStatus(UserStatus.ACTIVE);
+        return userDao.update(admin);
+    }
+
+    private Tree saveTree(User proposer, User reviewer) {
+        Tree tree = Tree.builder()
+                .latitude(45.7489)
+                .longitude(21.2087)
+                .species("Quercus robur")
+                .healthLevel(HealthLevel.GOOD)
+                .proposedBy(proposer)
+                .reviewedBy(reviewer)
+                .build();
+        return treeDao.persist(tree);
     }
 }

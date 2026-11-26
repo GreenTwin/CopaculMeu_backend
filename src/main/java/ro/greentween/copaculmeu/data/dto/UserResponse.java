@@ -34,6 +34,12 @@ public class UserResponse {
     @Schema(description = "Account confirmation status", example = "UNCONFIRMED")
     private UserStatus status;
 
+    @Schema(description = "Last successful sign-in. Omitted until the person has signed in.", example = "2026-11-01T12:00:00")
+    private LocalDateTime lastLoginAt;
+
+    @Schema(description = "Trees this person proposed. Set on the admin list and on admin edit. Omitted elsewhere.", example = "2")
+    private Long treesAdded;
+
     @Schema(description = "Account creation timestamp", example = "2026-10-24T10:00:00")
     private LocalDateTime createdAt;
 
@@ -50,6 +56,7 @@ public class UserResponse {
                 .name(user.getName())
                 .role(user.getRole())
                 .status(user.getStatus())
+                .lastLoginAt(user.getLastLoginAt())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

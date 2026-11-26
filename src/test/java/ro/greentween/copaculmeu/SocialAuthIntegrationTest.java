@@ -100,6 +100,23 @@ class SocialAuthIntegrationTest {
     }
 
     @Test
+    void googleLogin_success_setsLastLoginAtAndOmitsSubject() throws Exception {
+        StubVerifierConfig.next = identity("google-login-1", "ada.login@example.com", "Ada");
+
+        MvcResult result = signIn();
+
+        User stored = userDao.findByEmail("ada.login@example.com").orElseThrow();
+        assertThat(stored.getLastLoginAt()).isNotNull();
+        assertThat(stored.getGoogleSub()).isEqualTo("google-login-1");
+
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).doesNotContain("googleSub");
+        assertThat(body).doesNotContain("passwordHash");
+        assertThat(body).doesNotContain("appleSub");
+        assertThat(objectMapper.readTree(body).get("user").get("lastLoginAt").isNull()).isFalse();
+    }
+
+    @Test
     void secondLoginReturnsTheSameUser() throws Exception {
         StubVerifierConfig.next = identity("google-1", "ada@example.com", "Ada");
         signIn();
