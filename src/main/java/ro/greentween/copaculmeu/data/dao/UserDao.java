@@ -41,6 +41,17 @@ public class UserDao extends GenericDao<User> {
     }
 
     @Transactional
+    public void delete(User user) {
+        if (user == null || user.getId() == null) {
+            return;
+        }
+        User managed = entityManager.contains(user) ? user : entityManager.find(User.class, user.getId());
+        if (managed != null) {
+            entityManager.remove(managed);
+        }
+    }
+
+    @Transactional
     public void deleteAll() {
         entityManager.createQuery("DELETE FROM User").executeUpdate();
     }

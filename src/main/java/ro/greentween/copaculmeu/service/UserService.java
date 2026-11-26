@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import ro.greentween.copaculmeu.data.dao.TreeDao;
 import ro.greentween.copaculmeu.data.dao.UserActivationCodeDao;
 import ro.greentween.copaculmeu.data.dao.UserDao;
 import ro.greentween.copaculmeu.data.dto.*;
@@ -26,8 +27,11 @@ import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -36,6 +40,7 @@ import java.util.UUID;
 public class UserService {
 
     private final UserDao userDao;
+    private final TreeDao treeDao;
     private final UserActivationCodeDao activationCodeDao;
     private final CodeEncryptorFactory codeEncryptorFactory;
     private final EmailService emailService;
@@ -232,6 +237,12 @@ public class UserService {
         List<UserResponse> responses = users.stream()
                 .map(UserResponse::fromEntity)
                 .toList();
+        if (!users.isEmpty()) {
+            Map<UUID, Long> treeCounts = treeDao.countByProposedByUserIds(users.stream().map(User::getId).toList());
+            for (UserResponse response : responses) {
+                response.setTreesAdded(treeCounts.getOrDefault(response.getId(), 0L));
+            }
+        }
 
         Pageable pageable = PageRequest.of(effectivePage, effectiveSize);
         return new PagedResponse<>(responses, pageable, totalElements);
@@ -257,6 +268,61 @@ public class UserService {
         User updated = userDao.update(user);
         log.info("User {} approved successfully by administrator", updated.getEmail());
         return UserResponse.fromEntity(updated);
+    }
+
+    @Transactional
+    public User recordSuccessfulLogin(User user) {
+        user.setLastLoginAt(LocalDateTime.now(ZoneId.of("UTC")));
+        return userDao.update(user);
+    }
+
+    @Transactional
+    public UserResponse updateAdminUser(UUID id, AdminUserUpdateRequest request, UUID callerId) {
+        if (request == null || (request.getName() == null && request.getRole() == null)) {
+            throw new IllegalArgumentException("Name or role is required");
+        }
+        User user = userDao.find(id);
+        if (user == null) {
+            throw new ResourceNotFoundException("User with id " + id + " not found");
+        }
+        if (request.getRole() != null) {
+            UserRole role = parseRole(request.getRole());
+            if (callerId != null && callerId.equals(user.getId()) && role != user.getRole()) {
+                throw new IllegalArgumentException("You cannot change your own role");
+            }
+            user.setRole(role);
+        }
+        if (request.getName() != null) {
+            String trimmed = request.getName().trim();
+            user.setName(trimmed.isEmpty() ? null : trimmed);
+        }
+        User updated = userDao.update(user);
+        UserResponse response = UserResponse.fromEntity(updated);
+        response.setTreesAdded(treeDao.countByProposedByUserIds(List.of(updated.getId())).getOrDefault(updated.getId(), 0L));
+        return response;
+    }
+
+    @Transactional
+    public void deleteAdminUser(UUID id, UUID callerId) {
+        User user = userDao.find(id);
+        if (user == null) {
+            throw new ResourceNotFoundException("User with id " + id + " not found");
+        }
+        if (callerId != null && callerId.equals(user.getId())) {
+            throw new IllegalArgumentException("You cannot delete your own account");
+        }
+        userDao.delete(user);
+    }
+
+    private UserRole parseRole(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Role must be USER or ADMIN");
+        }
+        try {
+            return UserRole.valueOf(raw.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Role must be USER or ADMIN");
+        }
     }
 
     @Transactional

@@ -30,12 +30,13 @@ import java.security.MessageDigest;
 public class AuthService {
 
     private final UserDao userDao;
+    private final UserService userService;
     private final JwtService jwtService;
 
     @Value("${app.security.pepper}")
     private String pepper;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
         User user = userDao.findByEmail(normalizedEmail).orElse(null);
@@ -81,7 +82,8 @@ public class AuthService {
         }
 
         log.info("User {} successfully logged in", normalizedEmail);
-        return issueSession(user, response);
+        User signedIn = userService.recordSuccessfulLogin(user);
+        return issueSession(signedIn, response);
     }
 
     public AuthResponse issueSession(User user, HttpServletResponse response) {

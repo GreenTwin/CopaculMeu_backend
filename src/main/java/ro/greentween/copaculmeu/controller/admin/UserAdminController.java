@@ -10,8 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import ro.greentween.copaculmeu.data.dto.AdminUserUpdateRequest;
 import ro.greentween.copaculmeu.data.dto.UserResponse;
+import ro.greentween.copaculmeu.security.UserPrincipal;
 import ro.greentween.copaculmeu.data.enums.UserRole;
 import ro.greentween.copaculmeu.data.enums.UserStatus;
 import ro.greentween.copaculmeu.service.UserService;
@@ -86,5 +89,43 @@ public class UserAdminController {
             throw new IllegalArgumentException("User status must be provided");
         }
         return ResponseEntity.ok(userService.setUserStatus(id, targetStatus));
+    }
+
+    @Operation(summary = "Edit a user's name and role (Admin only)",
+            description = "Updates the display name, the role, or both. The caller cannot change their own role.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "User updated"),
+            @ApiResponse(responseCode = "400", description = "Missing fields, invalid role, or the caller tried to change their own role"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator privileges required"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @PutMapping("/{id}")
+    public ResponseEntity<UserResponse> updateUser(
+            @Parameter(description = "User unique identifier (UUID)", required = true) @PathVariable UUID id,
+            @RequestBody AdminUserUpdateRequest request,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        UUID callerId = principal == null ? null : principal.getId();
+        return ResponseEntity.ok(userService.updateAdminUser(id, request, callerId));
+    }
+
+    @Operation(summary = "Remove a user (Admin only)",
+            description = "Deletes the account. Trees stay, with the proposer and reviewer cleared. The caller cannot delete their own account.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "User deleted"),
+            @ApiResponse(responseCode = "400", description = "The caller tried to delete their own account"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Authentication required"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - Administrator privileges required"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
+            @Parameter(description = "User unique identifier (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        UUID callerId = principal == null ? null : principal.getId();
+        userService.deleteAdminUser(id, callerId);
+        return ResponseEntity.noContent().build();
     }
 }

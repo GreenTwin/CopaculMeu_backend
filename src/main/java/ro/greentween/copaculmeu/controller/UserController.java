@@ -109,6 +109,7 @@ public class UserController {
         boolean isAdmin = principal != null && principal.getRole() == UserRole.ADMIN;
         if (!isOwner && !isAdmin) {
             response.setEmail(null);
+            response.setLastLoginAt(null);
         }
         return ResponseEntity.ok(response);
     }

@@ -23,6 +23,7 @@ import ro.greentween.copaculmeu.service.social.SocialNonceService;
 public class SocialAuthService {
 
     private final UserDao userDao;
+    private final UserService userService;
     private final IdTokenVerifier idTokenVerifier;
     private final SocialNonceService nonceService;
     private final AuthService authService;
@@ -32,7 +33,7 @@ public class SocialAuthService {
         SocialIdentity identity = idTokenVerifier.verify(idToken, nonceCookie);
         nonceService.consume(nonceCookie);
 
-        User user = linkGoogleAccount(identity);
+        User user = userService.recordSuccessfulLogin(linkGoogleAccount(identity));
         AuthResponse authResponse = authService.issueSession(user, response);
         nonceService.clear(response);
         return authResponse;

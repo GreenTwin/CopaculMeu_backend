@@ -10,7 +10,11 @@ import ro.greentween.copaculmeu.data.filter.TreeFilter;
 import ro.greentween.copaculmeu.data.model.Tree;
 import tech.petrepopescu.common.data.dao.GenericDao;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Repository
 public class TreeDao extends GenericDao<Tree> {
@@ -102,6 +106,33 @@ public class TreeDao extends GenericDao<Tree> {
                 .setParameter("radiusMeters", radiusMeters)
                 .setParameter("status", status != null ? status.name() : null)
                 .getResultList();
+    }
+
+    public Map<UUID, Long> countByProposedByUserIds(Collection<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> rows = entityManager.createQuery(
+                        "SELECT t.proposedBy.id, COUNT(t) FROM Tree t WHERE t.proposedBy.id IN :ids GROUP BY t.proposedBy.id",
+                        Object[].class)
+                .setParameter("ids", userIds)
+                .getResultList();
+        Map<UUID, Long> counts = new HashMap<>();
+        for (Object[] row : rows) {
+            counts.put((UUID) row[0], ((Number) row[1]).longValue());
+        }
+        return counts;
+    }
+
+    @Transactional
+    public void delete(Tree tree) {
+        if (tree == null || tree.getId() == null) {
+            return;
+        }
+        Tree managed = entityManager.contains(tree) ? tree : entityManager.find(Tree.class, tree.getId());
+        if (managed != null) {
+            entityManager.remove(managed);
+        }
     }
 
     @Transactional

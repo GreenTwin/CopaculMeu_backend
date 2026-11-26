@@ -64,6 +64,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/trees/**").permitAll()
                         // Admin user management endpoints
                         .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/", "/api/users/paged", "/api/admin/users/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/users/*", "/api/users/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/users/*", "/api/users/*").hasRole("ADMIN")
                         .requestMatchers("/api/users/*/approve", "/api/users/*/confirm", "/api/admin/users/*/approve", "/api/admin/users/*/confirm", "/api/users/*/status", "/api/admin/users/*/status").hasRole("ADMIN")
                         // Admin email template management endpoints
                         .requestMatchers("/api/admin/email-templates/**", "/api/email-templates/**").hasRole("ADMIN")
